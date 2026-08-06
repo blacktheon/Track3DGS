@@ -59,17 +59,20 @@ if a shareable mp4 is ever needed, it is a small add-on (camera path + `ns-rende
 not a scheduled deliverable.
 
 **Execution as sub-projects:** Phase 1 is built as five sequential sub-projects, each
-with its own mini-spec/plan and a visual smoke test before the next starts:
-1. **Video Cutter** — Gradio UI, lossless keyframe-snapped A→B stream-copy cut
-   (section selection feeding `extract`).
+ending in a visual smoke test before the next starts. Guiding rule: **use existing
+tools for all visualization** — custom code only where the pipeline itself requires it.
+1. **Section Cut** — no code: use **LosslessCut** for keyframe-snapped lossless A→B
+   export of the test section.
 2. **Frames & Views** — `extract` + `views` as batch CLIs; smoke test by inspecting
-   output frames/crops/masks.
-3. **Trajectory** — `track` (stella_vslam + metric scale); smoke test via trajectory
-   plot + sparse points.
+   output frames/crops/masks in the OS image viewer.
+3. **Trajectory** — `track` (stella_vslam + metric scale); smoke test via stella_vslam's
+   built-in SocketViewer (live tracking view) + the matplotlib QC plot.
 4. **First Splat** — `cells` + `train` on one cell in the global frame; smoke test by
-   flying through the section in SuperSplat.
-5. **Tiler** — `slice` + `pack`; smoke test by toggling 10 m tiles in SuperSplat and
-   inspecting boundaries; produces the manifest Unity consumes.
+   flying through the section in **SuperSplat**.
+5. **Tiler** — `slice` + `pack`; smoke test by toggling 10 m tiles in **SuperSplat**
+   and inspecting boundaries; produces the manifest Unity consumes. Optional stretch:
+   first Unity scene-view import via UnityGaussianSplatting (otherwise this is
+   Phase 0's opening step).
 
 **Provisional splat budget:** since Phase 0 runs later, training uses a provisional cap
 (assume ~1.2 M visible splats on device → ~400 K per 10 m tile at 3 active tiles;
