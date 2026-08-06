@@ -52,11 +52,24 @@ produce an investor-ready visual as early as possible; the Quest feasibility spi
 Seven scriptable stages (below, §4). No manual touch-ups anywhere — the same scripts
 must later run ~240× unattended.
 
-**Investor demo deliverable:** a polished desktop-quality flythrough of the
-reconstructed test section — a scripted-camera rendered video plus an interactive
-desktop viewer (SuperSplat or nerfstudio viewer). Desktop rendering shows 3DGS at full
-splat counts with no mobile compromises, so this is deliberately *not* gated on Quest
-work.
+**Investor demo deliverable:** an interactive desktop fly-through of the reconstructed
+test section (SuperSplat or nerfstudio viewer) — full splat counts, no mobile
+compromises, deliberately not gated on Quest work. No rendered video is produced;
+if a shareable mp4 is ever needed, it is a small add-on (camera path + `ns-render`),
+not a scheduled deliverable.
+
+**Execution as sub-projects:** Phase 1 is built as five sequential sub-projects, each
+with its own mini-spec/plan and a visual smoke test before the next starts:
+1. **Video Cutter** — Gradio UI, lossless keyframe-snapped A→B stream-copy cut
+   (section selection feeding `extract`).
+2. **Frames & Views** — `extract` + `views` as batch CLIs; smoke test by inspecting
+   output frames/crops/masks.
+3. **Trajectory** — `track` (stella_vslam + metric scale); smoke test via trajectory
+   plot + sparse points.
+4. **First Splat** — `cells` + `train` on one cell in the global frame; smoke test by
+   flying through the section in SuperSplat.
+5. **Tiler** — `slice` + `pack`; smoke test by toggling 10 m tiles in SuperSplat and
+   inspecting boundaries; produces the manifest Unity consumes.
 
 **Provisional splat budget:** since Phase 0 runs later, training uses a provisional cap
 (assume ~1.2 M visible splats on device → ~400 K per 10 m tile at 3 active tiles;
