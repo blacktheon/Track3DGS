@@ -31,8 +31,11 @@ def compute_static_mask(frames, var_thresh=5.0, protect_top_frac=0.0):
 
 
 def run_automask(project_dir, work_width=960, var_thresh=12.0, max_frames=60,
-                 dilate_px=8, protect_top_frac=0.38):
+                 dilate_px=8, protect_top_frac=0.38, force=False):
     p = Project(project_dir)
+    if p.mask_path.exists() and not force:
+        raise SystemExit(f"{p.mask_path} already exists (possibly hand-painted); "
+                         "re-run with --force to overwrite it")
     recs = read_jsonl(p.frames_meta)
     step = max(1, len(recs) // max_frames)
     sample = recs[::step]
@@ -68,9 +71,10 @@ def main():
     ap.add_argument("--var-thresh", type=float, default=12.0)
     ap.add_argument("--dilate", type=int, default=8, dest="dilate_px")
     ap.add_argument("--protect-top", type=float, default=0.38)
+    ap.add_argument("--force", action="store_true")
     a = ap.parse_args()
     run_automask(a.project, a.work_width, a.var_thresh, dilate_px=a.dilate_px,
-                 protect_top_frac=a.protect_top)
+                 protect_top_frac=a.protect_top, force=a.force)
 
 
 if __name__ == "__main__":
