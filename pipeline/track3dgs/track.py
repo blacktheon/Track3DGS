@@ -24,7 +24,7 @@ from .colmap_export import (load_images_txt, load_points3d_txt,
 from .io_utils import Project, ensure_dir, read_json, read_jsonl, write_json
 from .trajectory import arc_length, quat_to_R, yaw_view_pose
 
-YAW_PRIORITY = (90, -90, 45, -45, 135, -135)
+YAW_PRIORITY = (90, -90, 45, -45, 135, -135, 0, 180)
 
 
 def rig_pose_from_view(T_view, yaw_deg):
