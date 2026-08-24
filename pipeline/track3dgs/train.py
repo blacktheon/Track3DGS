@@ -15,7 +15,7 @@ from plyfile import PlyData
 from .io_utils import Project, ensure_dir
 
 
-def build_train_cmd(project, cell_id, iters, cap):
+def build_train_cmd(project, cell_id, iters):
     cell_dir = project.cells_dir / f"cell_{cell_id:03d}"
     return ["ns-train", "splatfacto",
             "--data", str(cell_dir),
@@ -24,8 +24,9 @@ def build_train_cmd(project, cell_id, iters, cap):
             "--timestamp", "run",
             "--max-num-iterations", str(iters),
             "--viewer.quit-on-train-completion", "True",
-            "--pipeline.model.strategy", "mcmc",
-            "--pipeline.model.max-gs-num", str(cap),
+            # nerfstudio 1.1.5 exposes no MCMC strategy / hard splat cap
+            # (verified via ns-train --help); the Quest splat budget is
+            # enforced later in slice/pack pruning per spec section 3.
             "colmap",
             "--colmap-path", "colmap",
             "--images-path", str(project.views_dir.resolve()),
@@ -55,9 +56,9 @@ def check_alignment(exported_ply, cell_colmap_dir, max_offset=2.0):
     return {"offset_m": offset, "ok": offset < max_offset}
 
 
-def run_train(project_dir, cell_id, iters=30000, cap=2_500_000, dry_run=False):
+def run_train(project_dir, cell_id, iters=30000, dry_run=False):
     p = Project(project_dir)
-    cmd = build_train_cmd(p, cell_id, iters, cap)
+    cmd = build_train_cmd(p, cell_id, iters)
     cfg = p.train_dir / f"cell_{cell_id:03d}" / "splatfacto" / "run" / "config.yml"
     exp = build_export_cmd(cfg, p.export_dir / f"cell_{cell_id:03d}")
     if dry_run:
@@ -82,10 +83,9 @@ def main():
     ap.add_argument("--project", required=True)
     ap.add_argument("--cell", type=int, required=True)
     ap.add_argument("--iters", type=int, default=30000)
-    ap.add_argument("--cap", type=int, default=2_500_000)
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
-    run_train(a.project, a.cell, a.iters, a.cap, a.dry_run)
+    run_train(a.project, a.cell, a.iters, a.dry_run)
 
 
 if __name__ == "__main__":

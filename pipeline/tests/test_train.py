@@ -6,13 +6,11 @@ from track3dgs.train import build_train_cmd, build_export_cmd, check_alignment
 
 def test_build_train_cmd_disables_normalization(tmp_path):
     p = Project(tmp_path / "sec")
-    cmd = build_train_cmd(p, 0, iters=30000, cap=2_500_000)
+    cmd = build_train_cmd(p, 0, iters=30000)
     s = " ".join(str(c) for c in cmd)
     assert "--center-method none" in s
     assert "--orientation-method none" in s
     assert "--auto-scale-poses False" in s
-    assert "--pipeline.model.strategy mcmc" in s
-    assert "--pipeline.model.max-gs-num 2500000" in s
     assert str(p.cells_dir / "cell_000") in s
     assert "--masks-path" in s
 
