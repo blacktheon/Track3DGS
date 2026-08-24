@@ -7,4 +7,6 @@ call "C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\
 set "CUDA_PATH=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.8"
 set "CUDA_HOME=%CUDA_PATH%"
 set "PATH=%CUDA_PATH%\bin;%~dp0..\.venv-train\Scripts;%PATH%"
+set "PYTHONUTF8=1"
+set "PYTHONIOENCODING=utf-8"
 %*
