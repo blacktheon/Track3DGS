@@ -56,7 +56,8 @@ def check_alignment(exported_ply, cell_colmap_dir, max_offset=2.0):
     return {"offset_m": offset, "ok": offset < max_offset}
 
 
-def run_train(project_dir, cell_id, iters=30000, dry_run=False):
+def run_train(project_dir, cell_id, iters=30000, dry_run=False,
+              export_only=False):
     p = Project(project_dir)
     cmd = build_train_cmd(p, cell_id, iters)
     cfg = p.train_dir / f"cell_{cell_id:03d}" / "splatfacto" / "run" / "config.yml"
@@ -65,7 +66,8 @@ def run_train(project_dir, cell_id, iters=30000, dry_run=False):
         print(" ".join(str(c) for c in cmd))
         print(" ".join(str(c) for c in exp))
         return
-    subprocess.run([str(c) for c in cmd], check=True)
+    if not export_only:
+        subprocess.run([str(c) for c in cmd], check=True)
     subprocess.run([str(c) for c in exp], check=True)
     src = p.export_dir / f"cell_{cell_id:03d}" / "splat.ply"
     dst = p.export_dir / f"cell_{cell_id:03d}.ply"
@@ -84,8 +86,10 @@ def main():
     ap.add_argument("--cell", type=int, required=True)
     ap.add_argument("--iters", type=int, default=30000)
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--export-only", action="store_true",
+                    help="skip training; export + alignment-check an existing run")
     a = ap.parse_args()
-    run_train(a.project, a.cell, a.iters, a.dry_run)
+    run_train(a.project, a.cell, a.iters, a.dry_run, a.export_only)
 
 
 if __name__ == "__main__":

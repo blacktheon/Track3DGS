@@ -9,4 +9,6 @@ set "CUDA_HOME=%CUDA_PATH%"
 set "PATH=%CUDA_PATH%\bin;%~dp0..\.venv-train\Scripts;%PATH%"
 set "PYTHONUTF8=1"
 set "PYTHONIOENCODING=utf-8"
+rem our own checkpoints are trusted; torch>=2.6 weights_only default breaks ns-export
+set "TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1"
 %*
