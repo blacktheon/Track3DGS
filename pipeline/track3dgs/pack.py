@@ -20,20 +20,71 @@ from .io_utils import Project, ensure_dir, read_json, write_json
 from .trajectory import R_to_quat
 
 
-def estimate_alignment(frames):
-    """Return (R, t0): rotation mapping mean camera-up to -Y, and the
-    trajectory start position (subtracted before rotation)."""
-    Ts = [np.array(f["T_wc"]).reshape(4, 4) for f in frames]
-    up = -np.mean([T[:3, 1] for T in Ts], axis=0)
-    up /= np.linalg.norm(up)
-    target = np.array([0.0, -1.0, 0.0])
-    v = np.cross(up, target)
-    c = float(np.dot(up, target))
+def _rotation_between(a, b):
+    """Minimal rotation taking unit vector a to unit vector b."""
+    v = np.cross(a, b)
+    c = float(np.dot(a, b))
     if np.linalg.norm(v) < 1e-12:
-        R = np.eye(3) if c > 0 else np.diag([1.0, -1.0, -1.0])
+        return np.eye(3) if c > 0 else np.diag([1.0, -1.0, -1.0])
+    vx = np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
+    return np.eye(3) + vx + vx @ vx * (1.0 / (1.0 + c))
+
+
+def ground_up_ransac(points, cam_positions, iters=500, tol=0.3, seed=0):
+    """Up = RANSAC ground-plane normal of near-track points, signed toward
+    the cameras (which sit above the road)."""
+    from scipy.spatial import cKDTree
+    d, _ = cKDTree(cam_positions).query(points)
+    near = points[d < 20.0]
+    if len(near) < 100:
+        return None
+    rng = np.random.default_rng(seed)
+    best_n, best_a, best_cnt = None, None, 0
+    for _ in range(iters):
+        a, b, c = near[rng.choice(len(near), 3, replace=False)]
+        n = np.cross(b - a, c - a)
+        norm = np.linalg.norm(n)
+        if norm < 1e-9:
+            continue
+        n = n / norm
+        cnt = int((np.abs((near - a) @ n) < tol).sum())
+        if cnt > best_cnt:
+            best_cnt, best_n, best_a = cnt, n, a
+    if best_n is None:
+        return None
+    if np.mean((cam_positions - best_a) @ best_n) < 0:
+        best_n = -best_n
+    return best_n
+
+
+def estimate_alignment(frames, points=None):
+    """Return (R, t0). R maps world-up to +Y (viewer/Unity convention) and
+    the mean travel direction into the +Z half-space; t0 is the trajectory
+    start. Up comes from the RANSAC ground plane when points are given
+    (geometry-based, robust to a tilted camera mount), else from the mean
+    camera up-axis."""
+    Ts = [np.array(f["T_wc"]).reshape(4, 4) for f in frames]
+    cam_positions = np.array([T[:3, 3] for T in Ts])
+    cam_up = -np.mean([T[:3, 1] for T in Ts], axis=0)
+    cam_up /= np.linalg.norm(cam_up)
+
+    up = None
+    if points is not None:
+        up = ground_up_ransac(points, cam_positions)
+    if up is None:
+        up = cam_up
+    elif np.dot(up, cam_up) < 0:
+        up = -up
+
+    R1 = _rotation_between(up, np.array([0.0, 1.0, 0.0]))
+    travel = R1 @ (cam_positions[-1] - cam_positions[0])
+    travel[1] = 0.0
+    if np.linalg.norm(travel) > 1e-9:
+        travel /= np.linalg.norm(travel)
+        R2 = _rotation_between(travel, np.array([0.0, 0.0, 1.0]))
     else:
-        vx = np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
-        R = np.eye(3) + vx + vx @ vx * (1.0 / (1.0 + c))
+        R2 = np.eye(3)
+    R = R2 @ R1
     t0 = Ts[0][:3, 3].copy()
     return R, t0
 
@@ -91,7 +142,18 @@ def run_pack(project_dir, merge=False, strip_sh=True):
     cj = read_json(p.cells_json)
     tile_len = cj["tile_length"]
     frames = read_json(p.poses_json)["frames"]
-    R, t0 = estimate_alignment(frames)
+    from .colmap_export import load_points3d_txt
+    pts_file = p.colmap_dir / "points3D.txt"
+    points = load_points3d_txt(pts_file) if pts_file.exists() else None
+    R, t0 = estimate_alignment(frames,
+                               points[:, :3] if points is not None else None)
+    if points is not None:
+        cams = np.array([np.array(f["T_wc"]).reshape(4, 4)[:3, 3]
+                         for f in frames])
+        n = ground_up_ransac(points[:, :3], cams)
+        if n is not None:
+            resid = np.degrees(np.arccos(np.clip((R @ n)[1], -1, 1)))
+            print(f"ground-plane tilt after alignment: {resid:.2f} deg")
 
     packed_dir = ensure_dir(p.tiles_dir / "packed")
     tiles, merged_parts = [], []

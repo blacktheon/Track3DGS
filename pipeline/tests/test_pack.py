@@ -22,14 +22,33 @@ def _tilted_frames(tilt_deg=30.0):
     return frames
 
 
-def test_estimate_alignment_levels_up():
+def test_estimate_alignment_levels_up_and_faces_z():
     frames = _tilted_frames(30.0)
     R, t0 = estimate_alignment(frames)
     T0 = np.array(frames[0]["T_wc"]).reshape(4, 4)
     up_world = -T0[:3, 1]                                   # camera -Y = up
     up_aligned = R @ up_world
-    assert np.allclose(up_aligned, [0, -1, 0], atol=1e-6)   # up -> -Y (y-down)
+    assert np.allclose(up_aligned, [0, 1, 0], atol=1e-6)    # up -> +Y (viewer)
     assert np.allclose(t0, [0, 0, 0], atol=1e-9)            # start at origin
+    travel = R @ np.array([1.0, 0, 0])                      # rig moved along +x
+    travel[1] = 0.0                                         # ignore climb component
+    travel /= np.linalg.norm(travel)
+    assert travel[2] > 0.99                                 # horizontally faces +Z
+
+
+def test_estimate_alignment_prefers_ground_plane():
+    frames = _tilted_frames(0.0)                            # cameras claim up=-y
+    rng = np.random.default_rng(1)
+    # ground plane y = +2 tilted 20deg about z; normal (sin,  -cos, 0)... build
+    # points on a plane whose normal is NOT the camera up axis
+    a = np.radians(20.0)
+    n = np.array([np.sin(a), -np.cos(a), 0.0])              # points "up" (-y-ish)
+    u = np.array([np.cos(a), np.sin(a), 0.0])
+    w = np.array([0.0, 0.0, 1.0])
+    uv = rng.uniform(-10, 10, (2000, 2))
+    pts = uv[:, :1] * u + uv[:, 1:] * w + n * (-2.0)        # 2 m below cameras
+    R, _ = estimate_alignment(frames, points=pts)
+    assert np.allclose(R @ n, [0, 1, 0], atol=0.02)         # ground normal -> +Y
 
 
 def _splat_dtype(with_sh=True):
