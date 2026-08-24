@@ -19,7 +19,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from .colmap_export import (load_images_txt, load_points3d_txt,
+from .colmap_export import (load_images_txt, load_points3d_full,
                             write_colmap_model)
 from .io_utils import Project, ensure_dir, read_json, read_jsonl, write_json
 from .trajectory import arc_length, quat_to_R, yaw_view_pose
@@ -150,7 +150,7 @@ def ingest_model(project, model_txt_dir, speed_kmh):
     for v in views:
         v["T_wc"] = v["T_wc"].copy()
         v["T_wc"][:3, 3] *= scale
-    points = load_points3d_txt(model_txt_dir / "points3D.txt")
+    points = load_points3d_full(model_txt_dir / "points3D.txt")
     if points is not None:
         points[:, :3] *= scale
 
@@ -206,8 +206,14 @@ def main():
     ap.add_argument("--colmap", default=r"C:\Work\tools\colmap\bin\colmap.exe")
     ap.add_argument("--speed-kmh", type=float, required=True)
     ap.add_argument("--overlap", type=int, default=36)
+    ap.add_argument("--ingest-only", action="store_true",
+                    help="skip COLMAP, re-ingest existing sparse_txt model")
     a = ap.parse_args()
-    run_track(a.project, a.colmap, a.speed_kmh, a.overlap)
+    if a.ingest_only:
+        p = Project(a.project)
+        ingest_model(p, p.track_dir / "colmap_work" / "sparse_txt", a.speed_kmh)
+    else:
+        run_track(a.project, a.colmap, a.speed_kmh, a.overlap)
 
 
 if __name__ == "__main__":

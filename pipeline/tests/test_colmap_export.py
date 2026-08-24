@@ -32,6 +32,19 @@ def test_load_images_txt_skips_observation_lines(tmp_path):
     assert [im["name"] for im in loaded] == ["a.jpg", "b.jpg"]
 
 
+def test_load_points3d_full_filters(tmp_path):
+    from track3dgs.colmap_export import load_points3d_full
+    # PID X Y Z R G B ERROR TRACK(image_id, point2d_idx)...
+    (tmp_path / "points3D.txt").write_text(
+        "# header\n"
+        "1 0 0 5 10 10 10 0.5 1 0 2 0 3 0\n"      # 3 obs, low error -> keep
+        "2 0 0 6 10 10 10 0.5 1 1 2 1\n"          # 2 obs: dropped by min_track
+        "3 0 0 7 10 10 10 9.9 1 2 2 2 3 2\n"      # high error: dropped
+        "4 0 0 8 10 10 10 0.5\n")                 # no track info -> keep (unknown)
+    pts = load_points3d_full(tmp_path / "points3D.txt", min_track=3, max_error=2.0)
+    assert [round(p[2]) for p in pts] == [5, 8]
+
+
 def test_points_none(tmp_path):
     intr = {"width": 10, "height": 10, "fx": 5, "fy": 5, "cx": 5, "cy": 5}
     write_colmap_model(tmp_path, intr, [], None)

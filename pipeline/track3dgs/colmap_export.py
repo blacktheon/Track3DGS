@@ -61,3 +61,23 @@ def load_points3d_txt(path):
             pts.append([float(f[1]), float(f[2]), float(f[3]),
                         float(f[4]), float(f[5]), float(f[6])])
     return np.array(pts) if pts else None
+
+
+def load_points3d_full(path, min_track=3, max_error=2.0):
+    """Like load_points3d_txt but drops low-quality points: reprojection error
+    above max_error, or seen in fewer than min_track images. Points without
+    track info (files written by us) pass through."""
+    pts = []
+    for line in Path(path).read_text().splitlines():
+        if not line.strip() or line.startswith("#"):
+            continue
+        f = line.split()
+        err = float(f[7]) if len(f) > 7 else None
+        track_len = (len(f) - 8) // 2 if len(f) > 8 else 0
+        if err is not None and err > max_error:
+            continue
+        if track_len and track_len < min_track:
+            continue
+        pts.append([float(f[1]), float(f[2]), float(f[3]),
+                    float(f[4]), float(f[5]), float(f[6])])
+    return np.array(pts) if pts else None
