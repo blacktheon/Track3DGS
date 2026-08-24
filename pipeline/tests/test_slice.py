@@ -19,6 +19,14 @@ def test_assign_tiles_pad_dropped():
     assert list(t) == [0, 1, 4, -1, -1]
 
 
+def test_support_mask():
+    from track3dgs.slice import support_mask
+    support = np.array([[0.0, 0, 0], [10.0, 0, 0]])
+    xyz = np.array([[0.5, 0, 0], [10.0, 2.0, 0], [50.0, 0, 0]])
+    m = support_mask(xyz, support, max_support_dist=2.5)
+    assert list(m) == [True, True, False]
+
+
 def test_prune_mask():
     dist = np.array([5.0, 100.0, 5.0])
     op_raw = np.array([3.0, 3.0, -10.0])       # sigmoid: .95, .95, ~4.5e-5

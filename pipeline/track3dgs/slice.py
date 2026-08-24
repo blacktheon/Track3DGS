@@ -31,7 +31,17 @@ def prune_mask(dist, opacity_raw, max_dist, min_opacity):
     return (dist <= max_dist) & (op >= min_opacity)
 
 
-def run_slice(project_dir, cell_id, max_dist=60.0, min_opacity=0.005):
+def support_mask(xyz, support_points, max_support_dist):
+    """Keep only Gaussians near photo-consistent geometry (COLMAP points).
+    Sky shells, underground mirror-fluff and end plugs have no support."""
+    tree = cKDTree(support_points)
+    d, _ = tree.query(xyz)
+    return d <= max_support_dist
+
+
+def run_slice(project_dir, cell_id, max_dist=60.0, min_opacity=0.005,
+              max_support_dist=2.5):
+    from .colmap_export import load_points3d_txt
     from .trajectory import resample_polyline
     p = Project(project_dir)
     cj = read_json(p.cells_json)
@@ -47,6 +57,14 @@ def run_slice(project_dir, cell_id, max_dist=60.0, min_opacity=0.005):
     xyz = np.stack([v["x"], v["y"], v["z"]], axis=1).astype(float)
     s, dist = gaussian_s_values(xyz, traj_pts, traj_s)
     keep = prune_mask(dist, v["opacity"].astype(float), max_dist, min_opacity)
+    if max_support_dist > 0:
+        pts_file = p.colmap_dir / "points3D.txt"
+        if pts_file.exists():
+            support = load_points3d_txt(pts_file)
+            n_before = int(keep.sum())
+            keep &= support_mask(xyz, support[:, :3], max_support_dist)
+            print(f"support pruning: {n_before - int(keep.sum()):,} unsupported "
+                  f"splats dropped")
     tiles = assign_tiles(s, cell["s_core"][0], cell["s_core"][1], tile_len)
 
     ensure_dir(p.tiles_dir)
@@ -65,8 +83,10 @@ def main():
     ap.add_argument("--cell", type=int, required=True)
     ap.add_argument("--max-dist", type=float, default=60.0)
     ap.add_argument("--min-opacity", type=float, default=0.005)
+    ap.add_argument("--max-support-dist", type=float, default=2.5,
+                    help="drop splats farther than this from any COLMAP point; 0 disables")
     a = ap.parse_args()
-    run_slice(a.project, a.cell, a.max_dist, a.min_opacity)
+    run_slice(a.project, a.cell, a.max_dist, a.min_opacity, a.max_support_dist)
 
 
 if __name__ == "__main__":
