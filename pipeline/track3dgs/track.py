@@ -42,6 +42,23 @@ def _parse_view_name(name):
     return stem, int(ytok)
 
 
+def drop_rig_outliers(views, max_dev=0.5):
+    """All views of a frame are crops of one 360 photo, so they must share one
+    optical centre. Views whose position deviates from their frame's median
+    centre by more than max_dev metres are mis-registered -> dropped."""
+    by_stem = {}
+    for v in views:
+        stem, _ = _parse_view_name(v["name"])
+        by_stem.setdefault(stem, []).append(v)
+    kept, dropped = [], []
+    for stem, group in by_stem.items():
+        centers = np.array([g["T_wc"][:3, 3] for g in group])
+        med = np.median(centers, axis=0)
+        for g, c in zip(group, centers):
+            (kept if np.linalg.norm(c - med) <= max_dev else dropped).append(g)
+    return kept, dropped
+
+
 def rig_poses_from_views(views):
     """views: [{"name": frame_XXXX_y+090.jpg, "T_wc": 4x4}] -> {stem: T_rig},
     picking the highest-priority registered yaw per frame."""
@@ -147,12 +164,31 @@ def ingest_model(project, model_txt_dir, speed_kmh):
     positions = np.array([rigs[s][:3, 3] for s in stems])
     scale = compute_scale(times, positions, speed_kmh)
 
+    # rig-consistency validation (threshold is metric, poses still unscaled)
+    views, bad = drop_rig_outliers(views, max_dev=0.5 / scale)
+    if bad:
+        print(f"rig validation: dropped {len(bad)} mis-registered views: "
+              + ", ".join(sorted(v['name'] for v in bad)[:8])
+              + (" ..." if len(bad) > 8 else ""))
+        rigs = rig_poses_from_views(views)
+        stems = sorted(s for s in rigs if s in t_by_stem)
+        times = [t_by_stem[s] for s in stems]
+        positions = np.array([rigs[s][:3, 3] for s in stems])
+        scale = compute_scale(times, positions, speed_kmh)
+
     for v in views:
         v["T_wc"] = v["T_wc"].copy()
         v["T_wc"][:3, 3] *= scale
     points = load_points3d_full(model_txt_dir / "points3D.txt")
     if points is not None:
         points[:, :3] *= scale
+        # radial filter: far low-parallax points (sky remnants, distant haze)
+        from scipy.spatial import cKDTree
+        d, _ = cKDTree(positions * scale).query(points[:, :3])
+        n_far = int((d > 60.0).sum())
+        points = points[d <= 60.0]
+        if n_far:
+            print(f"radial filter: dropped {n_far:,} points farther than 60 m")
 
     meta = read_json(p.views_meta)
     write_colmap_model(p.colmap_dir, meta, views, points)
