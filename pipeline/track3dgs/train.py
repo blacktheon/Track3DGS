@@ -80,7 +80,15 @@ def run_train(project_dir, cell_id, iters=30000, dry_run=False,
     ensure_dir(p.export_dir)
     shutil.move(str(src), str(dst))
     from .pack import transform_splats
-    ply = PlyData.read(str(dst))
+    import time
+    for attempt in range(4):   # a fresh move can be briefly locked by AV/indexer
+        try:
+            ply = PlyData.read(str(dst))
+            break
+        except OSError:
+            if attempt == 3:
+                raise
+            time.sleep(3)
     fixed = transform_splats(ply["vertex"].data, NS_EXPORT_FIX,
                              np.zeros(3), strip_sh=False)
     PlyData([PlyElement.describe(fixed, "vertex")]).write(str(dst))
