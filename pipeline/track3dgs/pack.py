@@ -150,23 +150,22 @@ def run_pack(project_dir, merge=False, strip_sh=True, euler=None):
     p = Project(project_dir)
     cj = read_json(p.cells_json)
     tile_len = cj["tile_length"]
-    frames = read_json(p.poses_json)["frames"]
-    from .colmap_export import load_points3d_txt
-    pts_file = p.colmap_dir / "points3D.txt"
-    points = load_points3d_txt(pts_file) if pts_file.exists() else None
-    R, t0 = estimate_alignment(frames,
-                               points[:, :3] if points is not None else None)
+    poses = read_json(p.poses_json)
+    frames = poses["frames"]
+    if poses.get("leveled"):
+        # frame already leveled by the level stage (mount calibration):
+        # tiles pass through untouched
+        R, t0 = np.eye(3), np.zeros(3)
+        print("frame is pre-leveled; pack applies no additional alignment")
+    else:
+        from .colmap_export import load_points3d_txt
+        pts_file = p.colmap_dir / "points3D.txt"
+        points = load_points3d_txt(pts_file) if pts_file.exists() else None
+        R, t0 = estimate_alignment(frames,
+                                   points[:, :3] if points is not None else None)
     if euler is not None:
         # viewer-measured correction (e.g. from SuperSplat's transform panel)
-        # baked on top of the automatic alignment
         R = euler_to_R(*euler) @ R
-    if points is not None:
-        cams = np.array([np.array(f["T_wc"]).reshape(4, 4)[:3, 3]
-                         for f in frames])
-        n = ground_up_ransac(points[:, :3], cams)
-        if n is not None:
-            resid = np.degrees(np.arccos(np.clip((R @ n)[1], -1, 1)))
-            print(f"ground-plane tilt after alignment: {resid:.2f} deg")
 
     packed_dir = ensure_dir(p.tiles_dir / "packed")
     tiles, merged_parts = [], []

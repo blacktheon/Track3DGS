@@ -10,9 +10,15 @@ import shutil
 import subprocess
 
 import numpy as np
-from plyfile import PlyData
+from plyfile import PlyData, PlyElement
 
 from .io_utils import Project, ensure_dir
+
+# nerfstudio's colmap loader bakes a COLMAP->OpenGL rotation (recorded in the
+# run's dataparser_transforms.json) that ns-export gaussian-splat does NOT
+# invert; this is its exact inverse, applied to every export so the PLY lands
+# back in our global frame.
+NS_EXPORT_FIX = np.array([[1.0, 0, 0], [0, 0, -1.0], [0, 1.0, 0]])
 
 
 def build_train_cmd(project, cell_id, iters):
@@ -73,6 +79,11 @@ def run_train(project_dir, cell_id, iters=30000, dry_run=False,
     dst = p.export_dir / f"cell_{cell_id:03d}.ply"
     ensure_dir(p.export_dir)
     shutil.move(str(src), str(dst))
+    from .pack import transform_splats
+    ply = PlyData.read(str(dst))
+    fixed = transform_splats(ply["vertex"].data, NS_EXPORT_FIX,
+                             np.zeros(3), strip_sh=False)
+    PlyData([PlyElement.describe(fixed, "vertex")]).write(str(dst))
     res = check_alignment(dst, p.cells_dir / f"cell_{cell_id:03d}" / "colmap")
     print(f"alignment offset {res['offset_m']:.2f} m -> "
           f"{'OK' if res['ok'] else 'FAILED (normalization leaked!)'}")
