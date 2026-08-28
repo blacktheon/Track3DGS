@@ -137,7 +137,16 @@ def tile_record(ply_path, tile_len, vertex=None):
                        "max": [float(x) for x in xyz.max(0)]}}
 
 
-def run_pack(project_dir, merge=False, strip_sh=True):
+def euler_to_R(x_deg, y_deg, z_deg):
+    """PlayCanvas/SuperSplat Euler convention: R = Rz @ Ry @ Rx (XYZ intrinsic)."""
+    x, y, z = np.radians([x_deg, y_deg, z_deg])
+    Rx = np.array([[1, 0, 0], [0, np.cos(x), -np.sin(x)], [0, np.sin(x), np.cos(x)]])
+    Ry = np.array([[np.cos(y), 0, np.sin(y)], [0, 1, 0], [-np.sin(y), 0, np.cos(y)]])
+    Rz = np.array([[np.cos(z), -np.sin(z), 0], [np.sin(z), np.cos(z), 0], [0, 0, 1]])
+    return Rz @ Ry @ Rx
+
+
+def run_pack(project_dir, merge=False, strip_sh=True, euler=None):
     p = Project(project_dir)
     cj = read_json(p.cells_json)
     tile_len = cj["tile_length"]
@@ -147,6 +156,10 @@ def run_pack(project_dir, merge=False, strip_sh=True):
     points = load_points3d_txt(pts_file) if pts_file.exists() else None
     R, t0 = estimate_alignment(frames,
                                points[:, :3] if points is not None else None)
+    if euler is not None:
+        # viewer-measured correction (e.g. from SuperSplat's transform panel)
+        # baked on top of the automatic alignment
+        R = euler_to_R(*euler) @ R
     if points is not None:
         cams = np.array([np.array(f["T_wc"]).reshape(4, 4)[:3, 3]
                          for f in frames])
@@ -195,8 +208,11 @@ def main():
     ap.add_argument("--project", required=True)
     ap.add_argument("--merge", action="store_true")
     ap.add_argument("--keep-sh", action="store_true")
+    ap.add_argument("--euler", default=None,
+                    help="viewer rotation to bake, SuperSplat-style 'x,y,z' degrees")
     a = ap.parse_args()
-    run_pack(a.project, a.merge, strip_sh=not a.keep_sh)
+    euler = tuple(float(v) for v in a.euler.split(",")) if a.euler else None
+    run_pack(a.project, a.merge, strip_sh=not a.keep_sh, euler=euler)
 
 
 if __name__ == "__main__":

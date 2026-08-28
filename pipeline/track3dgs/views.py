@@ -36,19 +36,31 @@ def run_views(project_dir, yaws=DEFAULT_YAWS, fov=100.0, size=1600):
     frames = read_jsonl(p.frames_meta)
 
     mask = cv2.imread(str(p.mask_path), cv2.IMREAD_GRAYSCALE)
-    mask_crops = {}
+    static_crops = {}
     for yaw in yaws:
         mc = _e2p(np.stack([mask] * 3, axis=-1), yaw, fov, size)[:, :, 0]
-        mask_crops[yaw] = (mc > 127).astype(np.uint8) * 255
+        static_crops[yaw] = (mc > 127).astype(np.uint8) * 255
 
+    sky_dir = p.root / "sky_masks"
     for rec in tqdm(frames, desc="views"):
         img = cv2.imread(str(p.frames_dir / rec["name"]))
+        sky_path = sky_dir / (rec["name"].rsplit(".", 1)[0] + ".png")
+        frame_mask = None
+        if sky_path.exists():
+            from .skymask import combine_keep_masks
+            sky = cv2.imread(str(sky_path), cv2.IMREAD_GRAYSCALE)
+            frame_mask = combine_keep_masks(mask, sky)
         for yaw in yaws:
             name = view_name(rec["name"], yaw)
             cv2.imwrite(str(p.views_dir / name), _e2p(img, yaw, fov, size),
                         [cv2.IMWRITE_JPEG_QUALITY, 95])
+            if frame_mask is None:
+                mcrop = static_crops[yaw]
+            else:
+                mc = _e2p(np.stack([frame_mask] * 3, axis=-1), yaw, fov, size)[:, :, 0]
+                mcrop = (mc > 127).astype(np.uint8) * 255
             cv2.imwrite(str(p.views_masks_dir / Path(name).with_suffix(".png").name),
-                        mask_crops[yaw])
+                        mcrop)
 
     write_json(p.views_meta, intrinsics(fov, size) | {"yaws": list(yaws)})
 

@@ -31,6 +31,22 @@ def _make_project(tmp_path):
     return p
 
 
+def test_run_views_combines_sky_mask(tmp_path):
+    from track3dgs.io_utils import ensure_dir as ed
+    p = _make_project(tmp_path)
+    # per-frame sky mask: top third excluded (visible in a 90deg FOV crop)
+    sky = np.full((256, 512), 255, dtype=np.uint8)
+    sky[:96, :] = 0
+    ed(p.root / "sky_masks")
+    cv2.imwrite(str(p.root / "sky_masks" / "frame_000000.png"), sky)
+    run_views(p.root, yaws=[90], fov=90.0, size=128)
+    m = cv2.imread(str(p.views_masks_dir / "frame_000000_y+090.png"),
+                   cv2.IMREAD_GRAYSCALE)
+    assert m[5, 64] == 0                        # top of crop: sky excluded
+    assert m[64, 64] == 255                     # centre kept
+    assert m[120, 64] == 0                      # bottom: vehicle mask still active
+
+
 def test_run_views(tmp_path):
     p = _make_project(tmp_path)
     run_views(p.root, yaws=[-90, 90], fov=90.0, size=128)

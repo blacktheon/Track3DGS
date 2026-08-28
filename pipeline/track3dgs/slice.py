@@ -31,12 +31,31 @@ def prune_mask(dist, opacity_raw, max_dist, min_opacity):
     return (dist <= max_dist) & (op >= min_opacity)
 
 
-def support_mask(xyz, support_points, max_support_dist):
+def support_mask(xyz, support_points, max_support_dist, dist_to_traj=None,
+                 protect_radius=8.0):
     """Keep only Gaussians near photo-consistent geometry (COLMAP points).
-    Sky shells, underground mirror-fluff and end plugs have no support."""
+    Sky shells, underground mirror-fluff and end plugs have no support.
+    Splats within protect_radius of the trajectory are always kept: the road
+    is textureless (sparse COLMAP points) but is never sky."""
     tree = cKDTree(support_points)
     d, _ = tree.query(xyz)
-    return d <= max_support_dist
+    keep = d <= max_support_dist
+    if dist_to_traj is not None:
+        keep |= dist_to_traj <= protect_radius
+    return keep
+
+
+def end_cut_mask(xyz, traj_positions, margin=10.0):
+    """Drop splats more than margin beyond either trajectory end along the
+    local travel direction (kills the far 'sky plug' at the corridor ends)."""
+    p0, p1 = traj_positions[0], traj_positions[-1]
+    d0 = p0 - traj_positions[min(5, len(traj_positions) - 1)]
+    d1 = p1 - traj_positions[max(-6, -len(traj_positions))]
+    d0 = d0 / (np.linalg.norm(d0) + 1e-12)      # points outward past the start
+    d1 = d1 / (np.linalg.norm(d1) + 1e-12)      # points outward past the end
+    beyond_start = (xyz - p0) @ d0 > margin
+    beyond_end = (xyz - p1) @ d1 > margin
+    return ~(beyond_start | beyond_end)
 
 
 def run_slice(project_dir, cell_id, max_dist=60.0, min_opacity=0.005,
@@ -62,9 +81,13 @@ def run_slice(project_dir, cell_id, max_dist=60.0, min_opacity=0.005,
         if pts_file.exists():
             support = load_points3d_txt(pts_file)
             n_before = int(keep.sum())
-            keep &= support_mask(xyz, support[:, :3], max_support_dist)
+            keep &= support_mask(xyz, support[:, :3], max_support_dist,
+                                 dist_to_traj=dist)
             print(f"support pruning: {n_before - int(keep.sum()):,} unsupported "
                   f"splats dropped")
+    n_before = int(keep.sum())
+    keep &= end_cut_mask(xyz, positions)
+    print(f"end cut: {n_before - int(keep.sum()):,} beyond-end splats dropped")
     tiles = assign_tiles(s, cell["s_core"][0], cell["s_core"][1], tile_len)
 
     ensure_dir(p.tiles_dir)
