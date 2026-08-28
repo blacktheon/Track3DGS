@@ -14,6 +14,17 @@ def test_sky_keep_mask_marks_sky_black_and_dilates():
     assert keep[40, 64] == 255                        # tree kept
 
 
+def test_bright_sky_mask_flags_blown_whites_above_horizon_only():
+    from track3dgs.skymask import bright_sky_mask
+    img = np.full((100, 200, 3), 60, np.uint8)        # dark scene
+    img[10:20, 50:90] = 250                            # blown white, upper part
+    img[80:90, 50:90] = 250                            # bright road, lower part
+    m = bright_sky_mask(img, row_frac=0.45)
+    assert m[15, 70] == 1                              # upper blown white = sky
+    assert m[85, 70] == 0                              # below horizon: untouched
+    assert m[50, 100] == 0                             # dark pixels untouched
+
+
 def test_combine_keep_masks_is_logical_and():
     a = np.full((8, 8), 255, np.uint8); a[0, 0] = 0
     b = np.full((8, 8), 255, np.uint8); b[7, 7] = 0

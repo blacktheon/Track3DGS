@@ -27,6 +27,16 @@ def sky_keep_mask(class_map, sky_ids=(ADE20K_SKY_ID,), dilate_px=8):
     return np.where(sky > 0, 0, 255).astype(np.uint8)
 
 
+def bright_sky_mask(img_bgr, row_frac=0.45, min_val=235, max_sat=45):
+    """Blown-out white sky (sun glare, bright clouds) sometimes escapes the
+    segmentation class. Backstop: very bright + low-saturation pixels above
+    the equirect horizon band are sky. Returns uint8 1=sky."""
+    hsv = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
+    bright = (hsv[:, :, 2] >= min_val) & (hsv[:, :, 1] <= max_sat)
+    bright[int(len(img_bgr) * row_frac):, :] = False
+    return bright.astype(np.uint8)
+
+
 def combine_keep_masks(a, b):
     """Logical AND of two keep-masks; b is resized to a's shape if needed."""
     if b.shape != a.shape:
@@ -62,6 +72,7 @@ def run_skymask(project_dir, work_width=2048, dilate_px=8,
         up = torch.nn.functional.interpolate(
             logits, size=small.shape[:2], mode="bilinear", align_corners=False)
         class_map = up.argmax(dim=1)[0].cpu().numpy()
+        class_map[bright_sky_mask(small) > 0] = ADE20K_SKY_ID
         keep_small = sky_keep_mask(class_map, dilate_px=dilate_px)
         keep = cv2.resize(keep_small, (w, h), interpolation=cv2.INTER_NEAREST)
         cv2.imwrite(str(out_dir / (r["name"].rsplit(".", 1)[0] + ".png")), keep)
