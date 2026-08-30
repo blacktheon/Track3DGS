@@ -106,7 +106,15 @@ def build_matcher_cmd(exe, db, overlap=36):
             "--SequentialMatching.overlap", str(overlap)]
 
 
-def build_mapper_cmd(exe, db, image_path, out_dir):
+GLOMAP_EXE = r"C:\Work\tools\glomap\bin\glomap.exe"
+
+
+def build_mapper_cmd(exe, db, image_path, out_dir, mapper="colmap"):
+    if mapper == "glomap":
+        return [GLOMAP_EXE, "mapper",
+                "--database_path", str(db),
+                "--image_path", str(image_path),
+                "--output_path", str(out_dir)]
     return [str(exe), "mapper",
             "--database_path", str(db),
             "--image_path", str(image_path),
@@ -213,7 +221,7 @@ def _scaled(T, s):
     return T2
 
 
-def run_track(project_dir, colmap_exe, speed_kmh, overlap=36):
+def run_track(project_dir, colmap_exe, speed_kmh, overlap=36, mapper="colmap"):
     p = Project(project_dir)
     work = ensure_dir(p.track_dir / "colmap_work")
     db = work / "database.db"
@@ -223,7 +231,7 @@ def run_track(project_dir, colmap_exe, speed_kmh, overlap=36):
     for cmd in (build_feature_cmd(colmap_exe, db, p.views_dir, masks,
                                   read_json(p.views_meta)),
                 build_matcher_cmd(colmap_exe, db, overlap),
-                build_mapper_cmd(colmap_exe, db, p.views_dir, sparse)):
+                build_mapper_cmd(colmap_exe, db, p.views_dir, sparse, mapper)):
         print(">>", " ".join(str(c) for c in cmd[:2]))
         subprocess.run([str(c) for c in cmd], check=True)
 
@@ -244,12 +252,13 @@ def main():
     ap.add_argument("--overlap", type=int, default=36)
     ap.add_argument("--ingest-only", action="store_true",
                     help="skip COLMAP, re-ingest existing sparse_txt model")
+    ap.add_argument("--mapper", default="colmap", choices=["colmap", "glomap"])
     a = ap.parse_args()
     if a.ingest_only:
         p = Project(a.project)
         ingest_model(p, p.track_dir / "colmap_work" / "sparse_txt", a.speed_kmh)
     else:
-        run_track(a.project, a.colmap, a.speed_kmh, a.overlap)
+        run_track(a.project, a.colmap, a.speed_kmh, a.overlap, a.mapper)
 
 
 if __name__ == "__main__":
