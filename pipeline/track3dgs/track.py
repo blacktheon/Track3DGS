@@ -250,7 +250,9 @@ def main():
     ap.add_argument("--overlap", type=int, default=36)
     ap.add_argument("--ingest-only", action="store_true",
                     help="skip COLMAP, re-ingest existing sparse_txt model")
-    ap.add_argument("--mapper", default="colmap", choices=["colmap", "glomap"])
+    ap.add_argument("--mapper", default="glomap", choices=["colmap", "glomap"],
+                    help="glomap = colmap global_mapper (~3x faster, default); "
+                         "colmap = incremental mapper (fallback)")
     a = ap.parse_args()
     if a.ingest_only:
         p = Project(a.project)

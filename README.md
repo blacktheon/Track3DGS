@@ -46,8 +46,10 @@ resident at a time. Visual quality only; no collision, viewer stays on the vehic
 3. **Sky mask** — `skymask` (Mask2Former + brightness backstop), per frame.
    *Smoke test:* `qc_sky\*.jpg` overlays.
 4. **Views + COLMAP** — `views` (8 pinhole yaws, combined masks) then `track`
-   (masked features, sequential matching, mapper) with automatic rig-consistency
-   validation (flier views dropped) and point quality/radial filters.
+   (masked features, sequential matching, **global mapper** — default since the
+   2026-08-31 A/B: ~3x faster than incremental, 100% registration, zero fliers,
+   0.9 cm trajectory agreement; `--mapper colmap` remains the fallback) with
+   automatic rig-consistency validation and point quality/radial filters.
    *Smoke test:* registration %, `qc_trajectory.png`, COLMAP GUI on `track\colmap`
    (the cleaned model — set Render options → min track length 0).
 5. **Level (fix orientation)** — `level` rotates the whole frame to the calibrated
