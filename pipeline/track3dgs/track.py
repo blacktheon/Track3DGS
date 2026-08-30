@@ -106,12 +106,10 @@ def build_matcher_cmd(exe, db, overlap=36):
             "--SequentialMatching.overlap", str(overlap)]
 
 
-GLOMAP_EXE = r"C:\Work\tools\glomap\bin\glomap.exe"
-
-
 def build_mapper_cmd(exe, db, image_path, out_dir, mapper="colmap"):
     if mapper == "glomap":
-        return [GLOMAP_EXE, "mapper",
+        # COLMAP >= 4.x ships the GLOMAP-style global SfM pipeline built in
+        return [str(exe), "global_mapper",
                 "--database_path", str(db),
                 "--image_path", str(image_path),
                 "--output_path", str(out_dir)]
