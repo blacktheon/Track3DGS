@@ -91,8 +91,10 @@ Tests: `python -m pytest` from `pipeline/` (50+, no GPU needed).
   flipped (~180°) relative to what *loads* level. Fix pending: one no-edit round-trip
   export to measure the bake exactly, then fold into the mount key.
 - **Residual canopy glitter**: `skyprune` removes the sky dome and much treetop glitter;
-  remnants persist (conservative thresholds). Next: training-time floater suppression
-  (StableGS-class) under evaluation.
+  remnants persist (conservative thresholds). A StableGS-class trainer was evaluated
+  (`gstrain.py`: gsplat MCMC cap + opacity reg + sparse-depth supervision) but lost the
+  visual A/B against Splatfacto + skyprune (2026-08-29); it remains available as an
+  experimental backend and as the only route to a training-time splat cap.
 - ns-export uses nerfstudio's internal frame; `train.py` undoes it (`NS_EXPORT_FIX`,
   verified against `dataparser_transforms.json`).
 - Windows: plyfile mmap blocks in-place rewrite (handled); nerfstudio needs UTF-8 env
