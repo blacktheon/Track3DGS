@@ -32,7 +32,7 @@ def test_check_alignment(tmp_path):
     (colmap / "points3D.txt").write_text("# hdr\n1 10 0 0 128 128 128 0.5\n"
                                          "2 20 0 0 128 128 128 0.5\n")
     good = tmp_path / "good.ply"
-    _write_ply(good, np.array([[14.0, 0, 0], [16.0, 0, 0]]))
+    _write_ply(good, np.array([[10.3, 0, 0], [19.6, 0, 0]]))  # near the points
     bad = tmp_path / "bad.ply"
     _write_ply(bad, np.array([[500.0, 0, 0]]))
     assert check_alignment(good, colmap)["ok"]

@@ -49,16 +49,26 @@ def build_export_cmd(config_yml, out_dir):
             "--output-dir", str(out_dir)]
 
 
-def check_alignment(exported_ply, cell_colmap_dir, max_offset=2.0):
+def check_alignment(exported_ply, cell_colmap_dir, max_offset=1.5,
+                    n_sample=2000, seed=0):
+    """Frame-leak guard: median nearest-neighbour distance from sampled
+    splats to the cell's COLMAP points. Both lie on real surfaces, so in the
+    correct frame the median is centimetres; any leaked rotation/flip/scale
+    puts it at metres. Robust to how densely each cloud samples the scene
+    (median cloud offsets are not)."""
+    from scipy.spatial import cKDTree
     v = PlyData.read(str(exported_ply))["vertex"]
-    centroid = np.array([np.median(v["x"]), np.median(v["y"]), np.median(v["z"])])
+    xyz = np.stack([v["x"], v["y"], v["z"]], axis=1).astype(float)
     pts = []
     for line in (cell_colmap_dir / "points3D.txt").read_text().splitlines():
         if line.strip() and not line.startswith("#"):
             f = line.split()
             pts.append([float(f[1]), float(f[2]), float(f[3])])
-    ref = np.median(np.array(pts), axis=0)
-    offset = float(np.linalg.norm(centroid - ref))
+    pts = np.array(pts)
+    rng = np.random.default_rng(seed)
+    sample = xyz[rng.choice(len(xyz), min(n_sample, len(xyz)), replace=False)]
+    d, _ = cKDTree(pts).query(sample)
+    offset = float(np.median(d))
     return {"offset_m": offset, "ok": offset < max_offset}
 
 
