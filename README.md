@@ -57,9 +57,11 @@ resident at a time. Visual quality only; no collision, viewer stays on the vehic
    loss); export auto-undoes nerfstudio's frame rotation; the NN-distance alignment
    guard fails loudly on any frame leak (expect ~0.06 m when healthy).
    *Smoke test:* the guard number, then the exported PLY in SuperSplat.
-7. **Prune & polish** — `skyprune` (mask-projection dome + colour-assisted glitter
-   removal), then optional manual cleanup in SuperSplat (start/end junk); finally
-   `slice` + `pack` produce the 10 m tiles + Unity manifest.
+7. **Prune & polish** — `skyprune` applies three automatic tiers: mask-projection
+   sky dome, colour-assisted canopy glitter, and needle-spike removal (one dominant
+   scale axis >0.5 m at >=8x anisotropy, or >5 m outright; flat road/wall splats
+   survive by construction). Then optional manual cleanup in SuperSplat (start/end
+   junk); finally `slice` + `pack` produce the 10 m tiles + Unity manifest.
    *Smoke test:* `cell_XXX_skyremoved.ply` (audit what was deleted), tile toggling.
 
 ## Pipeline stages (command reference, run per section from `pipeline/`)
