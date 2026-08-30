@@ -99,6 +99,9 @@ Tests: `python -m pytest` from `pipeline/` (50+, no GPU needed).
   verified against `dataparser_transforms.json`).
 - Windows: plyfile mmap blocks in-place rewrite (handled); nerfstudio needs UTF-8 env
   (handled in `cuda_env.bat`); background installers may silently die on missed UAC.
+- **Patched file in .venv-train** (reapply after any nerfstudio reinstall):
+  `nerfstudio/data/datamanagers/full_images_datamanager.py` — pin_memory falls back to
+  unpinned RAM when the page-locked limit is exceeded (sections >~1000 views OOM'd).
 
 ## Environments & tools
 
