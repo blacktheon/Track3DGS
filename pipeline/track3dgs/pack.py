@@ -186,7 +186,8 @@ def run_pack(project_dir, merge=False, strip_sh=True, euler=None):
 
     write_json(p.manifest_json, {
         "version": 1, "tile_length": tile_len, "total_s": cj["total_s"],
-        "coordinate_convention": "right-handed, y-down (COLMAP); Unity import: (x,-y,z)",
+        "coordinate_convention": "leveled global frame (mount-calibrated)",
+        "unity_import_euler": [180, 0, 0],   # verified in-editor 2026-08-31
         "sh_bands_stripped": bool(strip_sh),
         "alignment": {"rotation": [float(x) for x in R.reshape(-1)],
                       "translation": [float(x) for x in t0]},

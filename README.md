@@ -103,6 +103,15 @@ Copy-Item ..\data\section01\mask_equirect.png ..\data\sectionNN\   # rig mask is
 
 Tests: `python -m pytest` from `pipeline/` (50+, no GPU needed).
 
+## Unity editor preview (verified working)
+
+Project needs: **DX12** editor graphics API (wave intrinsics for the splat sorter),
+**Vulkan** for the Android/Quest target, `UnityGaussianSplatting` package, and the
+**GaussianSplatURPFeature added to every URP renderer asset** in use (PC + Mobile).
+Import full-SH exports (`cell_XXX_skypruned.ply`) via Tools → Gaussian Splats →
+Create GaussianSplatAsset; set the GameObject rotation to **(180, 0, 0)** — the
+verified Unity import constant, also recorded in each tile manifest.
+
 ## Calibration files (precious)
 
 - `pipeline/mount_calibration.json` — camera-axes directions in a level world; measured
