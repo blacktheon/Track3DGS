@@ -77,6 +77,15 @@ def sky_colored(rgb, min_blue=0.55, blue_margin=0.06, bright=0.85):
     return blue | white
 
 
+def needle_mask(log_scales, max_len=0.5, max_ratio=8.0, hard_max=5.0):
+    """Spike/needle artifacts: one dominant scale axis (s_max >> s_mid) at
+    significant absolute length. Flat discs (s_max ~ s_mid, e.g. road) are
+    legitimate and survive. hard_max prunes absurd blobs outright."""
+    s = np.sort(np.exp(log_scales), axis=1)[:, ::-1]     # s_max, s_mid, s_min
+    needle = (s[:, 0] > max_len) & (s[:, 0] / np.maximum(s[:, 1], 1e-9) > max_ratio)
+    return needle | (s[:, 0] > hard_max)
+
+
 def run_skyprune(project_dir, cell_id=0, threshold=0.6, max_range=50.0,
                  mask_width=960, color_assist=True, canopy_height=2.0,
                  color_frac=0.12):
@@ -115,14 +124,20 @@ def run_skyprune(project_dir, cell_id=0, threshold=0.6, max_range=50.0,
         n_col = int(glitter.sum())
         prune |= glitter
 
+    log_scales = np.stack([v[f"scale_{i}"] for i in range(3)], axis=1).astype(float)
+    needles = needle_mask(log_scales) & ~prune
+    n_needle = int(needles.sum())
+    prune |= needles
+
     keep = ~prune
     out = p.export_dir / f"cell_{cell_id:03d}_skypruned.ply"
     kept = np.asarray(v[keep])
     el = PlyElement.describe(kept, "vertex")
     PlyData([el]).write(str(out))
-    print(f"sky-pruned {int(prune.sum()):,} of {len(v):,} splats "
-          f"({100 * prune.mean():.1f}%): {n_geo:,} geometric (dome) "
-          f"+ {n_col:,} colour-assisted (canopy glitter) -> {out.name}")
+    print(f"pruned {int(prune.sum()):,} of {len(v):,} splats "
+          f"({100 * prune.mean():.1f}%): {n_geo:,} sky dome "
+          f"+ {n_col:,} canopy glitter + {n_needle:,} needle spikes "
+          f"-> {out.name}")
 
 
 def main():

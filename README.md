@@ -37,7 +37,32 @@ resident at a time. Visual quality only; no collision, viewer stays on the vehic
    Splats must have COLMAP-point support and mask-consistent projections to survive
    (`slice`, `skyprune`).
 
-## Pipeline stages (current, run per section from `pipeline/`)
+## The 7 steps per section
+
+1. **Cut & extract** — cut the section in LosslessCut → `data\raw\sectionNN.mp4`, then
+   `extract` pulls sharp frames. *Smoke test:* browse `frames\`.
+2. **Vehicle mask** — copy `mask_equirect.png` from a previous section (rig constant)
+   or hand-paint once. *Smoke test:* `qc_vehicle_mask.jpg` (red = excluded).
+3. **Sky mask** — `skymask` (Mask2Former + brightness backstop), per frame.
+   *Smoke test:* `qc_sky\*.jpg` overlays.
+4. **Views + COLMAP** — `views` (8 pinhole yaws, combined masks) then `track`
+   (masked features, sequential matching, mapper) with automatic rig-consistency
+   validation (flier views dropped) and point quality/radial filters.
+   *Smoke test:* registration %, `qc_trajectory.png`, COLMAP GUI on `track\colmap`
+   (the cleaned model — set Render options → min track length 0).
+5. **Level (fix orientation)** — `level` rotates the whole frame to the calibrated
+   orientation from `pipeline/mount_calibration.json`; origin at trajectory start.
+   *Smoke test:* `qc_leveled.png` — flat camera line, upright corridor cross-section.
+6. **Train 3DGS** — `cells` then `train` (Splatfacto, pose normalization off, masked
+   loss); export auto-undoes nerfstudio's frame rotation; the NN-distance alignment
+   guard fails loudly on any frame leak (expect ~0.06 m when healthy).
+   *Smoke test:* the guard number, then the exported PLY in SuperSplat.
+7. **Prune & polish** — `skyprune` (mask-projection dome + colour-assisted glitter
+   removal), then optional manual cleanup in SuperSplat (start/end junk); finally
+   `slice` + `pack` produce the 10 m tiles + Unity manifest.
+   *Smoke test:* `cell_XXX_skyremoved.ply` (audit what was deleted), tile toggling.
+
+## Pipeline stages (command reference, run per section from `pipeline/`)
 
 ```powershell
 $py  = "..\.venv\Scripts\python.exe"          # utility venv (py 3.14, no CUDA)

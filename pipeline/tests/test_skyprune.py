@@ -16,6 +16,19 @@ def test_equirect_uv_directions():
     assert abs(u[3] - 270) < 1
 
 
+def test_needle_mask_catches_spikes_not_discs():
+    from track3dgs.skyprune import needle_mask
+    # log-scales per splat (metres): needle, road disc, small leaf, huge blob
+    scales = np.log(np.array([
+        [2.0, 0.02, 0.02],     # needle: one dominant axis -> prune
+        [0.8, 0.7, 0.01],      # flat road disc -> keep
+        [0.05, 0.04, 0.03],    # small leaf -> keep
+        [8.0, 6.0, 5.0],       # absurdly huge blob -> prune (hard cap)
+    ]))
+    m = needle_mask(scales, max_len=0.5, max_ratio=8.0, hard_max=5.0)
+    assert list(m) == [True, False, False, True]
+
+
 def test_sky_colored_rules():
     from track3dgs.skyprune import sky_colored
     rgb = np.array([
