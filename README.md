@@ -37,6 +37,94 @@ resident at a time. Visual quality only; no collision, viewer stays on the vehic
    Splats must have COLMAP-point support and mask-consistent projections to survive
    (`slice`, `skyprune`).
 
+## Techniques, models & algorithms (detailed inventory)
+
+**Capture & preparation**
+- **LosslessCut** — keyframe-snapped stream-copy section cutting (zero re-encode).
+- **FFmpeg** — CFR section normalization, frame extraction, VSLAM proxy downscale.
+- **Variance-of-Laplacian sharpness scoring** with best-of-N group selection —
+  motion-blur rejection (keeps 1 of every 3 frames at 30 fps).
+
+**Masking**
+- Hand-painted equirect **vehicle mask** (rig constant, one per camera mount);
+  an automatic **temporal-variance mask** (per-pixel std over frames + morphology)
+  exists as a starting point (`automask`).
+- **Mask2Former (Swin-Large, ADE20K)** semantic segmentation — per-frame sky masks
+  (class 2); **SegFormer-b2** available as the lighter alternative.
+- **HSV brightness backstop** — blown-out sun/cloud pixels above the horizon band
+  forced to sky (segmentation misses saturated whites).
+- **Area-gated dilation** (connected-components) — safety margin around the sky dome
+  without eating foliage around small canopy gaps.
+
+**Structure-from-Motion (step 4)**
+- **Equirectangular→pinhole resampling** (`py360convert`) — 8-yaw virtual camera rig
+  (±45/±90/±135 + 0/180 bridge views), exact analytic **PINHOLE intrinsics** (fixed,
+  never refined).
+- **COLMAP 4.1.1**: GPU **SIFT** with mask-excluded regions, **sequential matching**
+  (48-neighbour window), and the **global SfM pipeline** (`global_mapper`, GLOMAP
+  lineage): **rotation averaging → track establishment → global positioning →
+  iterative bundle adjustment (Ceres) → retriangulation**. ~3x faster than the
+  **incremental mapper** (kept as fallback) with 100% registration on all sections.
+- **Rig-consistency validation** — all 8 views of a frame share one optical centre;
+  views deviating >0.5 m from the frame median are provably mis-registered and
+  dropped automatically.
+- Point hygiene: **track-length ≥ 3**, **reprojection error ≤ 2 px**, **60 m radial
+  filter** (cKDTree distance-to-trajectory).
+- **Speed-based metric scaling** — average vehicle speed x duration / reconstructed
+  arc-length (no GPS needed).
+
+**Orientation (step 5)**
+- **Mount calibration**: the camera-axes-to-gravity relation measured once from a
+  manual SuperSplat leveling, recovered via **attribute-fingerprint matching +
+  Kabsch/Procrustes rigid solve** (0.0 mm residual), then applied to every section by
+  **two-vector triad alignment** (camera-up + travel direction). **RANSAC plane
+  fitting** retained as a diagnostic (defeated by vegetation walls as an estimator).
+
+**3DGS training (step 6)**
+- **Nerfstudio Splatfacto** on the **gsplat CUDA rasterizer** — masked **L1 + SSIM**
+  photometric loss, adaptive densification, **pose normalization disabled** so
+  training stays in the leveled global metric frame.
+- **Export frame fix** — inverse of nerfstudio's COLMAP→OpenGL `applied_transform`
+  baked into every export (verified against `dataparser_transforms.json`).
+- **Alignment guard** — median **nearest-neighbour distance** (cKDTree) from sampled
+  splats to COLMAP points; ~0.07 m healthy, metres on any frame leak. Chosen after
+  median-offset metrics proved density-biased.
+- Evaluated and rejected by A/B: custom **gsplat MCMC trainer** with **opacity
+  regularization** and **sparse-depth supervision** (StableGS/TIDI-GS-class
+  mechanisms) — kept as experimental backend (`gstrain`), and the only route to a
+  training-time splat cap.
+
+**Artifact removal (step 7)**
+- **2D→3D mask lifting** (FlashSplat-style, training-free): every Gaussian centre
+  projected into all equirect sky masks via rig poses; ≥60% sky hits ⇒ sky dome.
+- **Colour-assisted glitter pruning** — SH0 base colour rules (blue/blown-white) AND
+  partial sky projection AND canopy height ⇒ treetop sparkle, road/verges immune.
+- **Needle-spike pruning** — scale-anisotropy shape test (dominant axis >0.5 m with
+  ≥8x mid-axis ratio, or >5 m outright); flat discs (roads/walls) survive by
+  construction.
+- **Support-distance pruning** — splats >2.5 m from any COLMAP point are unsupported
+  (sky shells, underground mirror-fluff), with an 8 m trajectory-protection zone for
+  the textureless road; **end-cut** drops content >10 m beyond the section ends.
+
+**Packaging & runtime prep**
+- **Arc-length tiling** — Gaussians bucketed into non-overlapping 10 m tiles by
+  nearest-trajectory-point arc-length; pad-zone ownership rules; per-tile PLYs +
+  **Unity manifest JSON** (bounds, counts, trajectory, transforms,
+  `unity_import_euler`).
+- **SH band stripping** (SH0) for rotation-exact transforms and Quest memory (~3x).
+
+**Evaluation & QC**
+- **Masked PSNR** — gsplat re-rendering at registered poses vs real crops.
+- **Kabsch trajectory comparison** across pose engines / calibration chains.
+- Per-stage visual QC artifacts (overlays, elevation projections, corridor
+  cross-sections) + **COLMAP GUI** / **SuperSplat** inspection.
+
+**Unity integration**
+- **UnityGaussianSplatting** (aras-p) — requires **DirectX 12** in-editor (wave
+  intrinsics for GPU sorting), **Vulkan** on the Android/Quest target, and the
+  **GaussianSplatURPFeature** on every URP renderer asset. Import constant:
+  rotation **(180, 0, 0)**.
+
 ## The 7 steps per section
 
 1. **Cut & extract** — cut the section in LosslessCut → `data\raw\sectionNN.mp4`, then
