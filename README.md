@@ -200,15 +200,39 @@ Import full-SH exports (`cell_XXX_skypruned.ply`) via Tools → Gaussian Splats 
 Create GaussianSplatAsset; set the GameObject rotation to **(180, 0, 0)** — the
 verified Unity import constant, also recorded in each tile manifest.
 
+## Track01 production setup (current)
+
+- **Footage**: body-locked re-exports from `.insv` (FlowState/direction-lock OFF —
+  stabilized exports rotate the hull in-frame on turns and break the static mask).
+  Rear-facing original orientation kept: a 180-yaw "inverse" re-export was A/B'd and
+  found geometrically identical (0.12 deg / 3.6 cm between independent runs) with a
+  slight quality edge to the original (one fewer encode generation).
+- **Section cutting**: user-curated timetable in `pipeline/cuts_track01.ps1` -
+  27 sections across 3 videos, ~2 s designed overlaps, lossless keyframe cuts
+  (integer-second keyframes, zero snap loss).
+- **Sky masking**: `--model union` — Mask2Former OR (hand-drawn sky prior AND tuned
+  blue-to-white colour test AND enclosed-cloud fill). Union beats either alone
+  (34.0% coverage vs 33.7/32.6) at +20 ms/frame. Prior lives in
+  `data/raw/track01_sky_prior.png`; for a 180-yaw export, masks transfer by a
+  half-width `np.roll` (see `*_inverse.png` variants).
+- **Batch**: `pipeline/run_track01_batch.ps1` runs all remaining sections
+  unattended (~48 min per ~25 m section; mapper ~11 min at 720 views — short
+  sections make global SfM cheap). Final models are copied to `data/Export/`
+  as `TrackNN-V-SN.ply` after skyprune (step 8).
+
 ## Calibration files (precious)
 
-- `pipeline/mount_calibration.json` — camera-axes directions in a level world; measured
-  once from a manual SuperSplat leveling, valid for the whole track (rig constant).
-  Re-derive only if the camera is remounted.
-- `data/section01/demo/leveling_calibration.json` — the raw measured rotation from the
-  user's leveled+edited export (fingerprint Kabsch, 0.0 mm residual); source of the above.
-- `data/sectionNN/mask_equirect.png` — hand-painted vehicle mask (white=keep). Reusable
-  across sections; back it up.
+- `pipeline/mount_calibration.json` — camera-axes directions in a level world;
+  re-measured 2026-09-03 for the body-locked exports from the user's SuperSplat
+  leveling of Track01-1-S1 (fingerprint Kabsch, 0.10 mm residual; the previous
+  stabilized-era key is kept as `mount_calibration_stabilized_backup.json`).
+  Re-derive only if the camera is remounted or the export style changes.
+- `data/raw/track01_vehicle_mask.png` — hand-painted vehicle mask for the
+  body-locked exports (99.5% static-hull coverage, verified across all 3 videos).
+- `data/raw/track01_sky_prior.png` — hand-drawn sky-candidate zone for the union
+  sky rule (black = sky possible).
+- `data/Export/` — final per-section deliverables (leveled, pruned, optionally
+  hand-polished in SuperSplat).
 
 ## Known open issues
 

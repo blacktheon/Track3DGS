@@ -9,6 +9,7 @@ param(
     [string]$MaskFrom = "..\data\raw\track01_vehicle_mask.png",
     [string]$SkyModel = "union",
     [string]$SkyPrior = "..\data\raw\track01_sky_prior.png",
+    [string]$ExportName = "",
     [int]$Overlap = 48
 )
 $ErrorActionPreference = "Stop"
@@ -35,6 +36,13 @@ Step "5-level"    { & $py -m track3dgs.level --project $Project }
 Step "6a-cells"   { & $py -m track3dgs.cells --project $Project }
 Step "6b-train"   { .\cuda_env.bat $pyt -m track3dgs.train --project $Project --cell 0 }
 Step "7-skyprune" { & $py -m track3dgs.skyprune --project $Project --cell 0 }
+Step "8-export"   {
+    New-Item -ItemType Directory -Force "..\data\Export" | Out-Null
+    $name = if ($ExportName) { $ExportName } else { Split-Path $Project -Leaf }
+    Copy-Item (Join-Path $Project "train\export\cell_000_skypruned.ply") `
+              ("..\data\Export\" + $name + ".ply") -Force
+    $global:LASTEXITCODE = 0
+}
 
 $timing += [pscustomobject]@{ step = "TOTAL"; minutes = [math]::Round(($timing | Measure-Object minutes -Sum).Sum, 1) }
 $timing | Format-Table -AutoSize
