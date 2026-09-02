@@ -1,7 +1,8 @@
 # Track01 section boundaries (user-curated 2026-09-02, videos re-exported
 # body-locked from .insv). Lossless keyframe cuts: -ss before -i snaps the
-# start to the previous keyframe; duration gets a +2 s tail buffer so the
-# requested end is always covered (sections deliberately overlap ~2 s anyway).
+# start to the previous keyframe. Exports carry integer-second keyframes
+# (verified: snap loss = 0), and sections already overlap ~2 s by design,
+# so durations are cut exactly to the requested span - no extra buffer.
 $src = "C:\Users\black\OneDrive\Desktop\BattleTank360Videos\Track01"
 $dst = "C:\Work\Unity\DSTA\Track3DGS\data\raw"
 
@@ -30,7 +31,7 @@ foreach ($video in $cuts.Keys | Sort-Object) {
         $out = Join-Path $outDir $name
         $args = @("-y", "-hide_banner", "-loglevel", "error",
                   "-ss", "$($s[0])", "-i", (Join-Path $src "$video.mp4"))
-        if ($null -ne $s[1]) { $args += @("-t", "$($s[1] - $s[0] + 2)") }
+        if ($null -ne $s[1]) { $args += @("-t", "$($s[1] - $s[0])") }
         $args += @("-c", "copy", "-an", "-avoid_negative_ts", "make_zero", $out)
         & ffmpeg @args
         if ($LASTEXITCODE -ne 0) { throw "cut failed: $video $name" }
