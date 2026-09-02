@@ -14,6 +14,38 @@ def test_sky_keep_mask_marks_sky_black_and_dilates():
     assert keep[40, 64] == 255                        # tree kept
 
 
+def test_color_sky_mask_blue_white_above_cutoff_only():
+    from track3dgs.skymask import color_sky_mask
+    img = np.zeros((100, 200, 3), np.uint8)
+    img[:, :] = (40, 120, 60)                  # BGR greenish forest everywhere
+    img[10:20, 20:40] = (230, 160, 60)         # sky blue, above cutoff -> sky
+    img[10:20, 60:80] = (245, 245, 245)        # white cloud, above -> sky
+    img[70:80, 20:40] = (230, 160, 60)         # blue but below cutoff -> kept
+    img[70:80, 60:80] = (200, 200, 200)        # bright grey road below -> kept
+    img[30:40, 120:140] = (60, 200, 90)        # sunlit green leaf above -> kept
+    img[10:20, 150:170] = (190, 195, 200)      # warm grey rock above -> kept
+    img[30:40, 20:40] = (180, 200, 160)        # pale green-cyan haze -> kept
+    m = color_sky_mask(img, lat_cutoff_frac=0.52)
+    assert m[15, 30] == 1 and m[15, 70] == 1
+    assert m[75, 30] == 0 and m[75, 70] == 0
+    assert m[35, 130] == 0
+    assert m[15, 160] == 0                     # warm grey spared (tuned rule)
+    assert m[35, 30] == 0                      # green-ish haze spared
+    assert m[50, 100] == 0                     # forest background untouched
+
+
+def test_fill_enclosed_sky_fills_clouds_keeps_trees():
+    from track3dgs.skymask import fill_enclosed_sky
+    prior = np.zeros((100, 100), bool); prior[:60, :] = True   # sky zone: top 60
+    sky = prior.copy()
+    sky[20:30, 40:60] = False              # cloud hole enclosed by sky
+    sky[40:60, 10:25] = False              # "tree crown": touches zone bottom
+    out = fill_enclosed_sky(sky, prior)
+    assert out[25, 50]                     # cloud filled
+    assert not out[50, 15]                 # tree crown preserved
+    assert not out[80, 50]                 # below zone untouched
+
+
 def test_bright_sky_mask_flags_blown_whites_above_horizon_only():
     from track3dgs.skymask import bright_sky_mask
     img = np.full((100, 200, 3), 60, np.uint8)        # dark scene

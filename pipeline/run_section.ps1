@@ -6,7 +6,9 @@ param(
     [Parameter(Mandatory)] [string]$Project,
     [Parameter(Mandatory)] [double]$SpeedKmh,
     [string]$Mapper = "glomap",
-    [string]$MaskFrom = "..\data\section01\mask_equirect.png",
+    [string]$MaskFrom = "..\data\raw\track01_vehicle_mask.png",
+    [string]$SkyModel = "union",
+    [string]$SkyPrior = "..\data\raw\track01_sky_prior.png",
     [int]$Overlap = 48
 )
 $ErrorActionPreference = "Stop"
@@ -26,7 +28,7 @@ function Step($name, $block) {
 
 Step "1-extract"  { & $py -m track3dgs.extract --video $Video --out $Project }
 Step "2-vehicle-mask" { Copy-Item $MaskFrom (Join-Path $Project "mask_equirect.png") -Force; $global:LASTEXITCODE = 0 }
-Step "3-skymask"  { .\cuda_env.bat $pyt -m track3dgs.skymask --project $Project --model mask2former }
+Step "3-skymask"  { .\cuda_env.bat $pyt -m track3dgs.skymask --project $Project --model $SkyModel --prior $SkyPrior }
 Step "4a-views"   { & $py -m track3dgs.views --project $Project --yaws "-135,-90,-45,0,45,90,135,180" }
 Step "4b-track"   { & $py -m track3dgs.track --project $Project --speed-kmh $SpeedKmh --overlap $Overlap --mapper $Mapper }
 Step "5-level"    { & $py -m track3dgs.level --project $Project }
