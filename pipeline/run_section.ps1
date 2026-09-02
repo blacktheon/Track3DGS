@@ -31,9 +31,20 @@ Step "1-extract"  { & $py -m track3dgs.extract --video $Video --out $Project }
 Step "2-vehicle-mask" { Copy-Item $MaskFrom (Join-Path $Project "mask_equirect.png") -Force; $global:LASTEXITCODE = 0 }
 Step "3-skymask"  { .\cuda_env.bat $pyt -m track3dgs.skymask --project $Project --model $SkyModel --prior $SkyPrior }
 Step "4a-views"   { & $py -m track3dgs.views --project $Project --yaws "-135,-90,-45,0,45,90,135,180" }
-Step "4b-track"   { & $py -m track3dgs.track --project $Project --speed-kmh $SpeedKmh --overlap $Overlap --mapper $Mapper }
+Step "4b-track"   {
+    # stale partial state from an interrupted run poisons COLMAP - always fresh
+    $work = Join-Path $Project "track\colmap_work"
+    if (Test-Path $work) { Remove-Item $work -Recurse -Force }
+    & $py -m track3dgs.track --project $Project --speed-kmh $SpeedKmh --overlap $Overlap --mapper $Mapper
+}
 Step "5-level"    { & $py -m track3dgs.level --project $Project }
-Step "6a-cells"   { & $py -m track3dgs.cells --project $Project }
+Step "6a-cells"   {
+    foreach ($d in @("cells", "train")) {
+        $path = Join-Path $Project $d
+        if (Test-Path $path) { Remove-Item $path -Recurse -Force }
+    }
+    & $py -m track3dgs.cells --project $Project
+}
 Step "6b-train"   { .\cuda_env.bat $pyt -m track3dgs.train --project $Project --cell 0 }
 Step "7-skyprune" { & $py -m track3dgs.skyprune --project $Project --cell 0 }
 Step "8-export"   {
@@ -43,6 +54,7 @@ Step "8-export"   {
               ("..\data\Export\" + $name + ".ply") -Force
     $global:LASTEXITCODE = 0
 }
+Step "9-qc"       { .\cuda_env.bat $pyt -m track3dgs.qc --project $Project }
 
 $timing += [pscustomobject]@{ step = "TOTAL"; minutes = [math]::Round(($timing | Measure-Object minutes -Sum).Sum, 1) }
 $timing | Format-Table -AutoSize

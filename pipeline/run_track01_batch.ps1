@@ -13,6 +13,11 @@ foreach ($job in $batch) {
     $sec = "section{0:d2}" -f $n
     $proj = "..\data\{0}_s{1:d2}" -f ($vid -replace "track", "t"), $n
     $export = "{0}-S{1}" -f ($vid -replace "track","Track"), $n
+    if (Test-Path ("..\data\Export\" + $export + ".ply")) {
+        Write-Host ">>> BATCH: $vid $sec already exported - skipping (resume)"
+        $results += [pscustomobject]@{ section = "$vid/$sec"; status = "DONE (earlier)"; minutes = 0 }
+        continue
+    }
     Write-Host ("=" * 60)
     Write-Host ">>> BATCH: $vid $sec -> $proj (export: $export)"
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
