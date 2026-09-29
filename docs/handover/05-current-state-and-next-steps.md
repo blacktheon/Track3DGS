@@ -1,5 +1,7 @@
 # 05 — Current State & Next Steps
 
+> **Historical snapshot:** The sections below describe the 2026-09-28 Track01 handover. For the 2026-09-29 continuous-route work, use [Step 1](../route-step1.md), [Step 2](../route-step2.md), and the [three-project integration design](../architecture/pipeline-integration.md). Track02 training outputs live under `data/routes/track02/r002/training/t001/`; its local `RESULTS.md` links each completed original, cleaned and trimmed model. These route outputs are separate from the older independently positioned files in `data/Export/`.
+
 ## 1. Exactly where work stopped
 
 The last active work was **the Unity VR viewing test** (LOD streaming + auto-drive).

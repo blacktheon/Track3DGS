@@ -1,5 +1,7 @@
 # Track3DGS — Project Handover
 
+> **2026-09-29 continuation:** The handover below records the earlier Track01 workflow. New continuous captures use the [Step 1 shared-route workflow](../route-step1.md) and [Step 2 regional training workflow](../route-step2.md). [Track02 has six draft regional results](../track02-t001-results.md) in one reviewed coordinate frame, with preserved original exports, route-core ownership, photographic seam reports and a two-model Unity preview. The historical Track01 quality and PC/Link results do not establish Track02 visual acceptance or standalone Quest performance.
+
 **Read this first.** This folder is a complete handover of the Track3DGS project from
 the development session (human owner + Claude Code) to whoever continues the work.
 It is written to be read cold — you do not need to have seen the original session.

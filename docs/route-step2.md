@@ -51,7 +51,7 @@ Centres project onto the closest **continuous route segment**, rather than onto 
 
 `reports/qc/cell_NNN/index.html` compares held-out photographs, original/clean renders and alpha. `boundary_NNN/index.html` compares each neighboring cleaned reference and the globally sorted pair of trimmed cores. Photographs are shown with the same sky/vehicle mask. PSNR and low-alpha coverage are diagnostic evidence; there is no invented numeric threshold that declares a seam accepted. Inspect colour, road continuity, vegetation silhouettes, holes and duplicate structures. At most two Gaussian models are resident in each QC render.
 
-If a seam fails, preserve the result and use the evidence to choose a wider context, denser image registration, revised boundary, or shared repair region. Automated context-expansion retries and synthetic lateral sweeps are not implemented in this first pass. No pipeline status currently grants human visual acceptance automatically.
+If a seam fails, preserve the result and use the evidence to choose a wider context, denser image registration, revised boundary, or shared repair region. Automated context-expansion retries and a reusable synthetic lateral-sweep command are not implemented. The [Track02 t001 results](track02-t001-results.md) include a separate one-run synthetic lateral diagnostic and its limitations. No pipeline status currently grants human visual acceptance automatically.
 
 ## Unity review in QuestSBTC
 
