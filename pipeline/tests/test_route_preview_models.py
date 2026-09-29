@@ -1,4 +1,6 @@
 import numpy as np
+import pytest
+from plyfile import PlyData
 from track3dgs.route_preview_models import recenter_vertices
 
 
@@ -13,3 +15,24 @@ def test_translation_cache_preserves_native_sh_and_restores_global_placement():
                                np.column_stack([v[n] for n in ('x','y','z')]),atol=1e-5)
     assert original.tobytes()==v.tobytes()
     assert max(abs(cache['x'].astype(np.float16).astype(np.float32)-cache['x'])) < .02
+
+
+def test_incomplete_preview_is_not_published_to_a_live_unity_project(tmp_path, monkeypatch):
+    from track3dgs.route_preview_models import write_preview_ply
+    destination = tmp_path / 'core.ply'
+    destination.write_bytes(b'existing complete asset')
+    vertices = np.zeros(1, dtype=[('x', '<f4')])
+    def interrupted_write(self, path):
+        assert str(path) != str(destination)
+        assert destination.read_bytes() == b'existing complete asset'
+        with open(path, 'wb') as stream:
+            stream.write(b'incomplete header')
+        raise OSError('Interrupted cache publication')
+    with monkeypatch.context() as patch:
+        patch.setattr(PlyData, 'write', interrupted_write)
+        with pytest.raises(OSError, match='Interrupted'):
+            write_preview_ply(vertices, destination)
+    assert destination.read_bytes() == b'existing complete asset'
+    assert list(tmp_path.iterdir()) == [destination]
+    write_preview_ply(vertices, destination)
+    assert len(PlyData.read(destination)['vertex'].data) == 1

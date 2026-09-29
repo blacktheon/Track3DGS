@@ -1,6 +1,7 @@
 """Disposable, translation-centred Unity cache; portable masters stay unchanged."""
 import argparse
 from pathlib import Path
+import uuid
 
 import numpy as np
 from plyfile import PlyData, PlyElement
@@ -13,6 +14,17 @@ def recenter_vertices(vertices,origin):
     result=vertices.copy()
     for axis,name in enumerate(('x','y','z')): result[name]-=origin[axis]
     return result
+
+
+def write_preview_ply(vertices, destination):
+    destination = Path(destination)
+    # Unity ignores dot-prefixed files. Publish only once every row is written.
+    temporary = destination.with_name('.' + destination.name + '.' + uuid.uuid4().hex + '.tmp')
+    try:
+        PlyData([PlyElement.describe(vertices, 'vertex')], byte_order='<').write(str(temporary))
+        temporary.replace(destination)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def publish_preview(workspace,run_root,unity_project,region):
@@ -39,7 +51,7 @@ def publish_preview(workspace,run_root,unity_project,region):
         if not(dst.exists() and cached.get('source_sha256')==digest and cached.get('origin')==origin.tolist() and cached.get('sha256')==file_hash(dst)):
             vertices=PlyData.read(str(src))['vertex'].data
             local=recenter_vertices(vertices,origin)
-            PlyData([PlyElement.describe(local,'vertex')],byte_order='<').write(str(dst))
+            write_preview_ply(local,dst)
             positions=np.column_stack([local[n] for n in ('x','y','z')])
             errors=np.linalg.norm(positions.astype(np.float16).astype(np.float32)-positions,axis=1)
             cached={'adapter':'native-rub-translation-cache-v1','source_sha256':digest,'sha256':file_hash(dst),
