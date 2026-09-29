@@ -1,4 +1,5 @@
 import json
+import subprocess
 from pathlib import Path
 
 import cv2
@@ -60,3 +61,12 @@ def test_fingerprint_changes_with_inputs_settings_and_tool_versions():
     assert a == stage_fingerprint('views', {'source': 'a'}, {'size': 1600}, {'code': 1})
     assert a != stage_fingerprint('views', {'source': 'b'}, {'size': 1600}, {'code': 1})
     assert a != stage_fingerprint('views', {'source': 'a'}, {'size': 800}, {'code': 1})
+
+
+def test_long_frame_selection_does_not_exceed_ffmpeg_expression_depth():
+    from track3dgs.route_ingest import build_select_filter
+    result = subprocess.run(['ffmpeg','-v','error','-f','lavfi','-i',
+        'testsrc=size=16x8:rate=30:duration=1','-vf',build_select_filter(list(range(0,1200,2))),
+        '-fps_mode','passthrough','-f','rawvideo','-pix_fmt','rgb24','pipe:1'],capture_output=True)
+    assert result.returncode == 0, result.stderr.decode()[-500:]
+    assert len(result.stdout) == 15*16*8*3

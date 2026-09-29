@@ -48,10 +48,23 @@ def preserve_mask(source, destination):
 
 
 def probe_timestamps(video):
-    out = subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'v:0',
+    out = subprocess.run(['ffprobe', '-v', 'error', '-threads', '8', '-select_streams', 'v:0',
                           '-show_frames', '-show_entries', 'frame=best_effort_timestamp_time',
                           '-of', 'json', str(video)], capture_output=True, text=True, check=True)
     return [float(f['best_effort_timestamp_time']) for f in json.loads(out.stdout)['frames']]
+
+
+def build_select_filter(indices):
+    # FFmpeg's expression parser has a recursion limit; a flat sum of hundreds
+    # of predicates fails as ENOMEM. A balanced tree grows logarithmically.
+    def expression(items):
+        if not items:
+            return '0'
+        if len(items)==1:
+            return f'eq(n,{items[0]})'
+        mid = len(items)//2
+        return '('+expression(items[:mid])+'+'+expression(items[mid:])+')'
+    return "select='" + expression(indices) + "'"
 
 
 def score_video(video, log_path):
@@ -106,7 +119,7 @@ def ingest_route(config):
                              cap['keyframe_hz'], cap['holdout_stride'])
     ensure_dir(p.frames_dir)
     select_path = state/'select_frames.filter'
-    select_path.write_text("select='" + '+'.join(f'eq(n,{r["src_index"]})' for r in records) + "'",
+    select_path.write_text(build_select_filter([r['src_index'] for r in records]),
                            encoding='ascii')
     print(f'Extracting {len(records)} route keyframes from {len(pts)} decoded frames', flush=True)
     with open(state/'extract.log', 'wb') as log:
