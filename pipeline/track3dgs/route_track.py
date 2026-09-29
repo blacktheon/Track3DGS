@@ -7,7 +7,7 @@ import numpy as np
 
 from .colmap_export import load_images_txt, load_points3d_full, write_colmap_model
 from .io_utils import Project, ensure_dir, read_json, read_jsonl, write_jsonl
-from .route_config import atomic_json, file_hash, stage_fingerprint
+from .route_config import atomic_json, file_hash, stage_fingerprint, pin_route_calibration
 from .track import (rig_poses_from_views, drop_rig_outliers, build_feature_cmd,
                     build_matcher_cmd, build_mapper_cmd, build_converter_cmd,
                     prepare_colmap_masks)
@@ -133,6 +133,7 @@ def run_logged(cmd, log_path):
 
 
 def reconstruct_route(config):
+    pin_route_calibration(config)
     p = Project(config['workspace'])
     work = ensure_dir(p.track_dir/'colmap_work')
     reports = ensure_dir(p.root/'reports')

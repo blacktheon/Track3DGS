@@ -9,7 +9,7 @@ import numpy as np
 
 from .extract import sharpness, select_sharp
 from .io_utils import Project, ensure_dir, read_jsonl, write_jsonl
-from .route_config import atomic_json, file_hash, stage_fingerprint
+from .route_config import atomic_json, file_hash, stage_fingerprint, pin_route_calibration
 
 
 def select_records(pts, scores, source_hash, group=3, keyframe_hz=2, holdout_stride=10):
@@ -92,6 +92,7 @@ def ingest_route(config):
     p = Project(config['workspace'])
     ensure_dir(p.root)
     state = ensure_dir(p.root/'state')
+    pin_route_calibration(config)
     preserve_mask(config['vehicle_mask'], p.mask_path)
     print('Hashing source and checking workspace identity', flush=True)
     inputs = {k: file_hash(config[k]) if config[k] else None

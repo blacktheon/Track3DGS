@@ -70,3 +70,25 @@ def test_long_frame_selection_does_not_exceed_ffmpeg_expression_depth():
         '-fps_mode','passthrough','-f','rawvideo','-pix_fmt','rgb24','pipe:1'],capture_output=True)
     assert result.returncode == 0, result.stderr.decode()[-500:]
     assert len(result.stdout) == 15*16*8*3
+
+
+def test_scale_change_cannot_overwrite_an_existing_route_revision(tmp_path):
+    from track3dgs.route_ingest import ingest_route
+    from track3dgs.route_config import atomic_json
+    source = tmp_path/'source.mp4'
+    subprocess.run(['ffmpeg','-v','error','-y','-f','lavfi','-i',
+                    'testsrc=size=64x32:rate=6:duration=1','-pix_fmt','yuv420p',str(source)],check=True)
+    mask = tmp_path/'mask.png'
+    cv2.imwrite(str(mask),np.full((32,64),255,np.uint8))
+    cfgpath = tmp_path/'config.json'
+    atomic_json(cfgpath, {'schema_version':1,'route_id':'fixture','revision':'r1',
+        'source_video':str(source),'workspace':str(tmp_path/'workspace'),'vehicle_mask':str(mask),
+        'sky_prior':None,'mount_calibration':None,'scale':{'method':'nominal_speed','speed_kmh':10},
+        'regions':{'core_length':100,'context_length':20,'start_margin':20,'end_margin':20}})
+    cfg = load_route_config(cfgpath)
+    workspace = ingest_route(cfg)
+    before = (workspace/'route_config.resolved.json').read_bytes()
+    cfg['scale']['speed_kmh'] = 20
+    with pytest.raises(ValueError,match='revision'):
+        ingest_route(cfg)
+    assert (workspace/'route_config.resolved.json').read_bytes() == before

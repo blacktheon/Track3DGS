@@ -21,12 +21,20 @@ def plan_regions(route, cameras, settings):
     svals = np.array([r['s'] for r in samples])
     times = np.array([r['timestamp_seconds'] for r in samples])
     pts = np.array([r['source_pts_seconds'] for r in samples])
-    def span(values, interval):
-        # Include the whole stop at an exact boundary in observation context.
-        unique, first = np.unique(svals,return_index=True)
-        last = np.searchsorted(svals,unique,side='right')-1
-        return [float(np.interp(interval[0],unique,values[first])),
-                float(np.interp(interval[1],unique,values[last]))]
+    def time_at(values, distance, include_stop_end=False):
+        first = int(np.searchsorted(svals,distance,side='left'))
+        if first<len(svals) and svals[first]==distance:
+            index = int(np.searchsorted(svals,distance,side='right'))-1 if include_stop_end else first
+            return float(values[index])
+        if first==0: return float(values[0])
+        if first==len(svals): return float(values[-1])
+        # Travel begins after the lower station's stop and ends upon first arrival
+        # at the upper station. Interpolating unique arrays spreads stops over travel.
+        lower = first-1
+        alpha = (distance-svals[lower])/(svals[first]-svals[lower])
+        return float(values[lower]+alpha*(values[first]-values[lower]))
+    def span(values, interval, end_inclusive=True):
+        return [time_at(values,interval[0]),time_at(values,interval[1],end_inclusive)]
     regions = []
     left = start
     while left < end-1e-8:
@@ -39,7 +47,7 @@ def plan_regions(route, cameras, settings):
         boundary_counts = [sum(abs(r['s']-boundary)<=10 for r in samples) for boundary in (left,right)]
         regions.append({'region_id':f'cell_{idx:03d}','cell_index':idx,'core_s':[left,right],
                         'core_end_inclusive':right==end, 'context_s':context,
-                        'core_time_seconds':span(times,[left,right]),
+                        'core_time_seconds':span(times,[left,right],right==end),
                         'context_time_seconds':span(times,context),
                         'context_source_pts_seconds':span(pts,context),
                         'train_camera_ids':train,'held_out_camera_ids':held,

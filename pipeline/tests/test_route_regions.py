@@ -37,3 +37,18 @@ def test_short_route_and_failed_coverage_do_not_produce_training_regions():
     route['coverage']['passed'] = False
     with pytest.raises(ValueError, match='coverage'):
         plan_regions(route, [], {'core_length':100,'context_length':20,'start_margin':20,'end_margin':20})
+
+
+def test_video_intervals_interpolate_travel_without_spreading_stopped_time():
+    route = route_fixture()
+    route['length'] = 10
+    route['samples'] = [dict(route['samples'][i],s=s,timestamp_seconds=t,source_pts_seconds=t+8)
+                        for i,(s,t) in enumerate(zip([0,5,5,5,10],[0,1,20,30,31]))]
+    plan = plan_regions(route,[],{'core_length':2.5,'context_length':0,'start_margin':0,'end_margin':0})
+    r = plan['regions']
+    assert r[0]['context_time_seconds'] == [0,.5]
+    assert r[1]['context_time_seconds'] == [.5,30]  # Inclusive context includes the complete stop.
+    assert r[1]['core_time_seconds'] == [.5,1]  # Half-open core gives the stop to the next region.
+    assert r[2]['core_time_seconds'] == [1,30.5]
+    assert r[3]['context_time_seconds'] == [30.5,31]
+    assert r[3]['context_source_pts_seconds'] == [38.5,39]

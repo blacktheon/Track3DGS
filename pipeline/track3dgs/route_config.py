@@ -24,6 +24,21 @@ def atomic_json(path, value):
     pending.replace(path)
 
 
+def pin_route_calibration(config):
+    """Never revise accepted coordinates in-place, including pre-pin workspaces."""
+    root = Path(config['workspace'])
+    settings = {k:config[k] for k in ('route_id','revision','scale')}
+    identity = root/'state'/'calibration_identity.json'
+    previous_config = root/'route_config.resolved.json'
+    if previous_config.exists():
+        previous = json.loads(previous_config.read_text(encoding='utf-8'))
+        if {k:previous[k] for k in settings} != settings:
+            raise ValueError('Route calibration changed; select a new revision to preserve existing coordinates')
+    if identity.exists() and json.loads(identity.read_text(encoding='utf-8')) != settings:
+        raise ValueError('Route calibration changed; select a new revision to preserve existing coordinates')
+    atomic_json(identity,settings)
+
+
 def load_route_config(path):
     path = Path(path).resolve()
     cfg = json.loads(path.read_text(encoding='utf-8-sig'))
