@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "route_id": "track02",
+  "revision": "r002",
+  "source_video": "C:\\Users\\black\\OneDrive\\Desktop\\BattleTank360Videos\\Track02\\Track02.mp4",
+  "workspace": "C:\\Work\\Unity\\DSTA\\Track3DGS\\data\\routes\\track02\\r002",
+  "vehicle_mask": "C:\\Work\\Unity\\DSTA\\Track3DGS\\data\\raw\\track01_vehicle_mask.png",
+  "sky_prior": "C:\\Work\\Unity\\DSTA\\Track3DGS\\data\\raw\\track01_sky_prior.png",
+  "mount_calibration": null,
+  "capture": {
+    "sharpness_group": 3,
+    "keyframe_hz": 2,
+    "view_size": 1600,
+    "fov_degrees": 100,
+    "yaws": [
+      -135,
+      -90,
+      -45,
+      0,
+      45,
+      90,
+      135,
+      180
+    ],
+    "holdout_stride": 10
+  },
+  "scale": {
+    "method": "nominal_speed",
+    "speed_kmh": 10,
+    "status": "approximate"
+  },
+  "reconstruction": {
+    "mapper": "glomap",
+    "overlap": 6,
+    "max_gap_seconds": 2,
+    "panorama_rig": true,
+    "reuse_feature_database": "C:\\Work\\Unity\\DSTA\\Track3DGS\\data\\routes\\track02\\r001\\track\\colmap_work\\database.db"
+  },
+  "regions": {
+    "core_length": 100,
+    "context_length": 20,
+    "start_margin": 20,
+    "end_margin": 20
+  },
+  "toolchain": {
+    "colmap": "C:/Work/tools/colmap/bin/colmap.exe",
+    "training_python": "C:/Work/Unity/DSTA/Track3DGS/.venv-train/Scripts/python.exe"
+  }
+}

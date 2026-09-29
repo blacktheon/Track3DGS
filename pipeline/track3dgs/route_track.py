@@ -14,14 +14,14 @@ from .track import (rig_poses_from_views, drop_rig_outliers, build_feature_cmd,
 from .trajectory import arc_length, quat_to_R
 
 
-def read_view_poses(path):
+def read_view_poses(path, aliases=None):
     views = []
     for im in load_images_txt(path):
         qw,qx,qy,qz = im['q']
         R = quat_to_R(qx,qy,qz,qw)
         T = np.eye(4)
         T[:3,:3], T[:3,3] = R.T, -R.T @ np.asarray(im['t'])
-        views.append({'name':im['name'], 'T_wc':T})
+        views.append({'name':aliases[im['name']] if aliases else im['name'], 'T_wc':T})
     return views
 
 
@@ -148,9 +148,20 @@ def reconstruct_route(config):
         raise ValueError('SfM inputs changed; use a new workspace revision')
     atomic_json(identity, {'fingerprint':fingerprint})
     db = work/'database.db'
-    masks = prepare_colmap_masks(p, work/'masks')
-    for name,cmd in [('features',build_feature_cmd(exe,db,p.views_dir,masks,meta)),
-                     ('matching',build_matcher_cmd(exe,db,config['reconstruction']['overlap']))]:
+    image_path,aliases = p.views_dir,None
+    rig = config['reconstruction'].get('panorama_rig',False)
+    if rig:
+        from .route_rig import prepare_rig_layout
+        image_path,aliases = prepare_rig_layout(p,work,config,fingerprint)
+        commands = []
+    else:
+        masks = prepare_colmap_masks(p, work/'masks')
+        commands = [('features',build_feature_cmd(exe,db,image_path,masks,meta))]
+    matching = build_matcher_cmd(exe,db,config['reconstruction']['overlap'])
+    if rig:
+        matching += ['--FeatureMatching.rig_verification','1','--FeatureMatching.skip_image_pairs_in_same_frame','1']
+    commands.append(('matching',matching))
+    for name,cmd in commands:
         done = state/(name+'_done.json')
         if not (done.exists() and db.exists()):
             run_logged(cmd,reports/(name+'.log'))
@@ -161,10 +172,12 @@ def reconstruct_route(config):
     else:
         attempt = len(list(work.glob('sparse_attempt_*')))+1
         sparse = ensure_dir(work/f'sparse_attempt_{attempt:03d}')
-        cmd = build_mapper_cmd(exe,db,p.views_dir,sparse,config['reconstruction']['mapper'])
+        cmd = build_mapper_cmd(exe,db,image_path,sparse,config['reconstruction']['mapper'])
         if config['reconstruction']['mapper']=='glomap':
             # Intrinsics came from a deterministic panorama projection and must stay fixed.
             cmd += ['--GlobalMapper.ba_refine_focal_length','0', '--GlobalMapper.ba_refine_extra_params','0']
+        if rig:
+            cmd += ['--GlobalMapper.refine_sensor_from_rig' if config['reconstruction']['mapper']=='glomap' else '--Mapper.ba_refine_sensor_from_rig','0']
         run_logged(cmd,reports/f'mapper_{attempt:03d}.log')
         atomic_json(mapper_done, {'fingerprint':fingerprint,'sparse':str(sparse)})
     components, models = [], []
@@ -173,7 +186,7 @@ def reconstruct_route(config):
             continue
         txt = ensure_dir(work/('model_txt_'+folder.name))
         run_logged(build_converter_cmd(exe,folder,txt), reports/('convert_'+folder.name+'.log'))
-        views = read_view_poses(txt/'images.txt')
+        views = read_view_poses(txt/'images.txt',aliases)
         rigs = rig_poses_from_views(views)
         components.append({'id':folder.name, 'registered_views':len(views), 'rig_frames':len(rigs)})
         models.append((len(rigs),txt,views))
