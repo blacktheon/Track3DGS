@@ -38,6 +38,23 @@ Video-only reconstruction can drift. The nominal speed establishes total scale, 
 
 The virtual-camera rig follows [COLMAP's documented panorama workflow](https://colmap.github.io/rigs.html). All eight crops from one panorama share an optical centre and exposure pose. The source projection and feature/masking algorithms are reused. Intrinsics and relative virtual-camera rotations remain fixed during reconstruction.
 
+## Track02 result — 29 September 2026
+
+Revision **r002** is the current preview candidate: 421/421 panorama positions and 3,368/3,368 projected views registered in one connected reconstruction, with no missing intervals or inconsistent crop centres. The source sparse model contains 181,669 points and has a mean reprojection error of 0.615 pixels. Five-second speed P95/median is 1.29 and maximum/median is 1.31, consistent with the user's broadly steady-driving description. No speed-based pose corrections were applied.
+
+The display length is **583.3 nominal metres**, solely because the global scale assumes 10 km/h over 210 seconds. This is not a measured route length. Vertical alignment and absolute grade remain provisional. The result is ready for visual review, **not approved for Gaussian training**.
+
+| Region | Core / nominal metres | Source video context / seconds |
+|---|---:|---:|
+| `cell_000` | 20–120 | 0.00–50.56 |
+| `cell_001` | 120–220 | 35.29–83.68 |
+| `cell_002` | 220–320 | 71.42–118.59 |
+| `cell_003` | 320–420 | 100.75–153.82 |
+| `cell_004` | 420–520 | 139.35–194.71 |
+| `cell_005` | 520–563.33 | 180.58–210.00 |
+
+Inspect `data/routes/track02/r002/reports/index.html` for the route, elevation and motion plots. QuestSBTC's dedicated `Track02_RoutePreview` scene uses the same r002 poses; its `Assets/TrackRoutePreview/Track02/source.json` identifies the source workspace and its build report records the route hash. The six intervals include training context; they are deliberately longer than the disjoint output cores.
+
 ## Outputs
 
 All generated data goes under the configured workspace, such as `data/routes/track02/r002/` (Git-ignored). `r001` is retained as a rejected diagnostic: it registered all 421 keyframes but placed 326 of 583 nominal metres within the first 15 seconds. Its region plan has been withheld.
