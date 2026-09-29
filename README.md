@@ -1,5 +1,9 @@
 # Track3DGS
 
+> **Current redesign (2026-09-29):** Track3DGS owns continuous-route reconstruction and regional training/assembly. [VR3DGS](https://github.com/blacktheon/VR3DGS) owns general manual reduction and offline LOD generation; the consuming application owns runtime streaming and renderer selection. Read the [system design](docs/architecture/pipeline-integration.md), [portable package contract](docs/contracts/asset-package-v1.md), and [reuse/modification plan](docs/superpowers/plans/2026-09-29-route-reconstruction-and-regions.md). The new [Step 1 route workflow](docs/route-step1.md) implements bounded continuous-video ingestion, shared camera coordinates, training-region proposals and Unity marker export. Dense regional training, seam validation and package export remain planned work.
+>
+> The technical inventory below preserves the working section pipeline and its experimental history. Its global coordinates apply within each separately processed section; use the opt-in route workflow for a continuous capture. The older fixed 10 m tiles / nearest-three design is historical. Standalone Quest performance has not been established by the PC/Link tests.
+
 **360° vehicle-mounted track video → chunked 3D Gaussian Splatting → streamed in Unity on Quest 3.**
 
 A 12 km forest track is recorded once with a roof-mounted 360° camera (8K equirect, 30 fps).
