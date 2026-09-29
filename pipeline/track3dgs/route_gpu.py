@@ -65,7 +65,7 @@ def main():
         original = Trainer.train_iteration
         def iteration(self, step):
             result = original(self, step)
-            if step % 1000 == 0 or step + 1 == self.config.max_num_iterations:
+            if step % 1000 == 0 or step + 1 == self._start_step + self.config.max_num_iterations:
                 print('ROUTE_PROGRESS ' + json.dumps({'step': step, 'loss': float(result[0].detach()),
                     'splats': int(self.pipeline.model.num_points), 'elapsed_seconds': time.monotonic()-started,
                     'gpu_peak_allocated_gb': torch.cuda.max_memory_allocated()/2**30,

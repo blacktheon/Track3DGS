@@ -6,7 +6,7 @@ from pathlib import Path
 from .io_utils import read_json
 from .route_config import atomic_json, file_hash
 from .route_training import gpu_lease, run_gpu, run_region_training
-from .route_assembly import cleanup_and_partition
+from .route_assembly import cleanup_and_partition, processed_files_match
 from .route_preview_models import publish_preview
 
 
@@ -47,7 +47,7 @@ def main():
         if marker.exists():
             report=read_json(marker);model=read_json(folder/'model.json')
             if (report['raw_sha256']==model['raw_sha256'] and
-                all((folder/(kind+'.ply')).exists() and report[kind+'_sha256']==file_hash(folder/(kind+'.ply')) for kind in ['clean','core'])):
+                all(processed_files_match(folder,report,kind) for kind in ['clean','core'])):
                 return
         cleanup_and_partition(root,run,region)
     def qc(flag,index,key):

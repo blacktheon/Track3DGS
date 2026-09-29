@@ -11,6 +11,22 @@ from track3dgs.io_utils import write_json, write_jsonl
 from track3dgs.colmap_export import write_colmap_model, load_images_txt
 
 
+def test_resume_runs_only_remaining_iterations_and_handles_complete_checkpoint(tmp_path):
+    from track3dgs.route_training import configure_resume
+    directory=tmp_path/'checkpoints';directory.mkdir()
+    (directory/'step-000028000.ckpt').write_bytes(b'checkpoint')
+    command=build_region_train_cmd(tmp_path,tmp_path/'run',0,30000,Path('python.exe'))
+    resumed,completed=configure_resume(command,directory,30000)
+    assert completed==28001
+    assert resumed[resumed.index('--max-num-iterations')+1]=='1999'
+    assert resumed[resumed.index('--load-step')+1]=='28000'
+    (directory/'step-000029999.ckpt').write_bytes(b'complete')
+    assert configure_resume(command,directory,30000)==(None,30000)
+    (directory/'step-000030000.ckpt').write_bytes(b'overtrained')
+    with pytest.raises(ValueError,match='past'):
+        configure_resume(command,directory,30000)
+
+
 def test_region_commands_keep_distinct_paths_and_fixed_frame(tmp_path):
     cmds = [build_region_train_cmd(tmp_path, tmp_path/'run', i, 30000, Path('python.exe')) for i in [0,1,2]]
     assert len({c[c.index('--data')+1] for c in cmds}) == 3

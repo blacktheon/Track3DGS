@@ -11,7 +11,7 @@ from plyfile import PlyData
 
 from .io_utils import read_json, read_jsonl
 from .package_contract import file_ref, gaussian_bounds, validate_package
-from .route_assembly import PROVENANCE_DTYPE
+from .route_assembly import PROVENANCE_DTYPE, processed_files_match
 from .route_config import atomic_json, file_hash
 
 
@@ -28,11 +28,22 @@ def export_reconstruction(workspace,run_root,output,revision,git_commit=None):
         rid=region['region_id'];folder=run/'models'/rid
         model=read_json(folder/'model.json');processing=read_json(folder/'processing.json')
         src=folder/'core.ply'
-        if file_hash(src)!=processing['core_sha256']: raise ValueError('Processed model changed: '+rid)
+        if not processed_files_match(folder,processing,'core'): raise ValueError('Processed model or provenance changed: '+rid)
+        raw=Path(model['raw_file'])
+        if file_hash(raw)!=model['raw_sha256']: raise ValueError('Original model changed: '+rid)
         ply=staging/'regions'/(rid+'.ply');ply.parent.mkdir(exist_ok=True);shutil.copy2(src,ply)
         ids=np.fromfile(folder/'core.provenance.bin',dtype=PROVENANCE_DTYPE)
         if len(ids)!=processing['core_count'] or np.any(ids['source_index']!=region['cell_index']):
             raise ValueError('Unexpected source identity in '+rid)
+        original=PlyData.read(str(raw))['vertex'].data
+        core=PlyData.read(str(src))['vertex'].data
+        if len(original)!=model['count'] or (len(ids) and ids['source_row'].max()>=len(original)):
+            raise ValueError('Source row out of range in '+rid)
+        for start in range(0,len(ids),65536):
+            rows=ids['source_row'][start:start+65536]
+            if not np.array_equal(original[rows],core[start:start+65536]):
+                raise ValueError('Core attributes disagree with their original source rows: '+rid)
+        del original,core
         ids['source_index']=source_index
         provenance=ply.with_suffix('.provenance.bin');ids.tofile(provenance)
         source_id=str(uuid.uuid5(family,rid+':'+model['raw_sha256']))

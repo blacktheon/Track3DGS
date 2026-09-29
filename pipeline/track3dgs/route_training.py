@@ -4,6 +4,7 @@ from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import time
 
@@ -28,6 +29,21 @@ def build_region_train_cmd(workspace, run_root, cell_index, iters, python):
         '--pipeline.model.camera-optimizer.mode','off']
     cmd += ['--assume-colmap-world-coordinate-convention','False','--downscale-factor','1']
     return [str(c) for c in cmd]
+
+
+def configure_resume(command, checkpoints, target_iterations):
+    saved=[(int(match.group(1)),path) for path in Path(checkpoints).glob('step-*.ckpt')
+           if (match:=re.fullmatch(r'step-(\d+)\.ckpt',path.name))]
+    if not saved: return list(command),0
+    step,_=max(saved);completed=step+1
+    if completed>target_iterations: raise ValueError('Checkpoint is past the intended training target')
+    if completed==target_iterations: return None,completed
+    result=list(command)
+    # Nerfstudio 1.1.5 treats max_num_iterations as ADDITIONAL iterations on resume.
+    result[result.index('--max-num-iterations')+1]=str(target_iterations-completed)
+    at=result.index('colmap')
+    result[at:at]=['--load-dir',str(checkpoints),'--load-step',str(step)]
+    return result,completed
 
 
 def prepare_region_dataset(workspace, run_root, region):
@@ -139,12 +155,17 @@ def run_region_training(workspace, region, settings):
     if not train_done.exists():
         command = build_region_train_cmd(root,run,region['cell_index'],settings['iterations'],python)
         checkpoints = cfg.parent/'nerfstudio_models'
-        if checkpoints.exists() and list(checkpoints.glob('step-*.ckpt')):
-            command[command.index('colmap'):command.index('colmap')] = ['--load-dir',str(checkpoints)]
-        atomic_json(out/'progress.json',{'status':'training','pid':os.getpid(),'fingerprint':fingerprint})
-        print(f'TRAINING {rid}; log={reports/(rid+"_train.log")}',flush=True)
-        run_gpu(command,reports/(rid+'_train.log'))
-        atomic_json(train_done,{'fingerprint':fingerprint,'elapsed_seconds':time.monotonic()-start})
+        command,completed = configure_resume(command,checkpoints,settings['iterations'])
+        if command is not None:
+            atomic_json(out/'progress.json',{'status':'training','pid':os.getpid(),'fingerprint':fingerprint,'resumed_after_steps':completed})
+            print(f'TRAINING {rid}; log={reports/(rid+"_train.log")}',flush=True)
+            run_gpu(command,reports/(rid+'_train.log'))
+        final_step=settings['iterations']-1
+        if not (checkpoints/f'step-{final_step:09d}.ckpt').exists():
+            raise ValueError('Training did not produce the requested final checkpoint')
+        atomic_json(train_done,{'fingerprint':fingerprint,'elapsed_seconds':time.monotonic()-start,
+            'resumed_after_steps':completed,'completed_steps':settings['iterations'],
+            'timing_scope':'last invocation only' if completed else 'full training run'})
     parser = read_json(cfg.parent/'dataparser_transforms.json')
     if not np.allclose(export_local_to_package(parser),np.eye(4),atol=1e-6):
         raise ValueError('Expected explicit native route frame; dataparser transform drifted')

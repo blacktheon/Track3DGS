@@ -14,6 +14,13 @@ from .skyprune import sky_fractions, sky_colored, splat_rgb, needle_mask
 PROVENANCE_DTYPE = np.dtype([('source_index','<u4'),('source_row','<u8')],align=False)
 
 
+def processed_files_match(folder,report,kind):
+    folder=Path(folder);ply=folder/(kind+'.ply');provenance=folder/(kind+'.provenance.bin')
+    return (ply.is_file() and provenance.is_file() and
+        report.get(kind+'_provenance_bytes')==12*report[kind+'_count']==provenance.stat().st_size and
+        report.get(kind+'_sha256')==file_hash(ply) and report.get(kind+'_provenance_sha256')==file_hash(provenance))
+
+
 def project_to_route(points, route_xyz, route_s, batch_size=2048):
     """Exact nearest segment, with explicit close nonadjacent-branch ambiguity.
 
@@ -105,6 +112,8 @@ def cleanup_and_partition(workspace,run_root,region):
         'cleanup':{'sky_fraction':.6,'sky_range_nominal_m':50,'mask_width':960,'train_frames_only':True,
             'color_fraction':.12,'color_height_above_local_route':2,'needle_max_len':.5,'needle_ratio':8,'hard_max':5},
         'clean_sha256':file_hash(out/'clean.ply'),'core_sha256':file_hash(out/'core.ply'),
+        'clean_provenance_sha256':file_hash(out/'clean.provenance.bin'),'clean_provenance_bytes':12*nclean,
+        'core_provenance_sha256':file_hash(out/'core.provenance.bin'),'core_provenance_bytes':12*ncore,
         'seam_status':'pending render review; unique centre ownership does not establish a gap-free seam',
         'status':'draft'}
     atomic_json(out/'processing.json',result)
