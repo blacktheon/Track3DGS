@@ -8,6 +8,7 @@ from .route_config import load_route_config, atomic_json, stage_fingerprint, fil
 from .route_ingest import ingest_route
 from .route_track import reconstruct_route, run_logged
 from .route_regions import plan_regions, write_region_subsets
+from .route_quality import evaluate_route_quality, withhold_region_plan
 
 
 def prepare_views(config):
@@ -57,14 +58,22 @@ def run_route(config_path, through='regions', resume=True, dry_run=False):
     reconstruct_route(config)
     route = read_json(workspace/'route.json')
     cameras = read_jsonl(workspace/'cameras.jsonl')
+    review_path = workspace/'reports'/'visual_review.json'
+    quality = evaluate_route_quality(route, config.get('quality', {}), read_json(review_path) if review_path.exists() else None)
+    route['quality'] = quality
+    if not quality['passed']:
+        route['status'] = 'quality_failed'
+        withhold_region_plan(workspace, quality)
+    atomic_json(workspace/'route.json', route)
+    atomic_json(workspace/'reports'/'quality.json', quality)
     plan = None
-    if through=='regions' and route['coverage']['passed']:
+    if through=='regions' and quality['passed']:
         plan = plan_regions(route,cameras,config['regions'])
         write_region_subsets(workspace,plan)
     from .route_report import write_reports
     write_reports(workspace,route,plan)
-    if not route['coverage']['passed']:
-        raise RuntimeError('Coverage failed. Diagnostic visualizations written; training plan withheld.')
+    if not quality['passed']:
+        raise RuntimeError('Route quality failed (' + ', '.join(quality['failures']) + '). Diagnostic visualizations written; training plan withheld.')
     return {'workspace':str(workspace),'through':through,'status':route['status'],
             'regions':len(plan['regions']) if plan else 0,'training_started':False}
 

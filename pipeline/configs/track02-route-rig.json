@@ -7,6 +7,7 @@
   "vehicle_mask": "C:\\Work\\Unity\\DSTA\\Track3DGS\\data\\raw\\track01_vehicle_mask.png",
   "sky_prior": "C:\\Work\\Unity\\DSTA\\Track3DGS\\data\\raw\\track01_sky_prior.png",
   "mount_calibration": null,
+  "quality": {"capture_motion": "broadly_similar_speed", "source": "User confirmed moving most of the time at a similar speed"},
   "capture": {
     "sharpness_group": 3,
     "keyframe_hz": 2,

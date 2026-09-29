@@ -12,6 +12,8 @@ from .route_config import atomic_json
 def plan_regions(route, cameras, settings):
     if not route['coverage']['passed']:
         raise ValueError('Route coverage failed; repair registration before planning training regions')
+    if not route.get('quality', {}).get('passed', True):
+        raise ValueError('Route quality failed; training region plan withheld')
     total = route['length']
     start,end = settings['start_margin'], total-settings['end_margin']
     core,pad = settings['core_length'], settings['context_length']

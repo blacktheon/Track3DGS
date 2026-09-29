@@ -30,6 +30,8 @@ def unity_preview(route, plan):
                         'heldOut':sample.get('split')=='held_out'})
     return {'schemaVersion':1,'routeId':route.get('route_id','route'),
             'status':route.get('status','diagnostic'), 'length':route['length'],
+            'qualityPassed':route.get('quality',{}).get('passed',False),
+            'qualityNote':', '.join(route.get('quality',{}).get('failures',[])) or 'Provisional route; visual review required',
             'scaleNote':f"{route['scale']['status']} scale / {route['scale']['method']}; absolute grade unmeasured",
             'coordinateNote':'Unity LH +X right +Y up +Z forward. RUB Z reflection applied once by exporter.',
             'maxGapSeconds':route['coverage'].get('max_gap_seconds',2),'markers':markers,
@@ -78,24 +80,59 @@ def write_reports(workspace, route, plan):
     text = (f"{len(samples):,} camera positions\n{coverage.get('registered_views',0):,} registered pinhole views\n"
             f"{route['length']:.1f} nominal metres\n{coverage['registered_fraction']:.1%} keyframe coverage\n"
             f"{len(coverage['components'])} reconstruction component(s)")
-    legend.text(0,.88,text,color='#cbd5e1',fontsize=12,linespacing=1.8,va='top',transform=legend.transAxes)
+    legend.text(0,.88,text,color='#cbd5e1',fontsize=11,linespacing=1.4,va='top',transform=legend.transAxes)
+    quality = route.get('quality',{})
+    status_color = '#fb7185' if quality.get('passed') is False else '#94a3b8'
+    legend.text(0,.685,route.get('status','diagnostic').replace('_',' ').upper(),color=status_color,fontsize=11,transform=legend.transAxes)
     y=.64
     legend.text(0,y,'PROPOSED TRAINING REGIONS',color='white',fontsize=11,weight='bold',transform=legend.transAxes)
     for r in (plan['regions'] if plan else []):
         y-=.065
         a,b = r['core_s']; t0,t1 = r['context_time_seconds']
         legend.text(0,y,f"{r['region_id']}   {a:.0f}–{b:.0f} m\nVideo context  {t0:.1f}–{t1:.1f} s",color=COLORS[r['cell_index']%len(COLORS)],fontsize=10,linespacing=1.4,transform=legend.transAxes)
-    note = 'Scale assumes 10 km/h average speed.\nNo GPS, metric reference or gravity measurement.\nGrey route ends are capture margins.\nContext overlaps; future output cores do not.\nCamera trajectory is not a road surface.\nGaussian training has not started.'
+    if plan is None:
+        legend.text(0,.59,'No training cuts published.\nInspect coverage and motion evidence.',color=status_color,fontsize=11,linespacing=1.6,transform=legend.transAxes)
+    scale = route['scale']
+    scale_note = f"Scale assumes {scale['speed_kmh']:g} km/h average speed." if scale['method']=='nominal_speed' else f"Scale: {scale['status']} / {scale['method']}."
+    note = scale_note+'\nNo GPS, metric reference or gravity measurement.\nGrey route ends are capture margins.\nContext overlaps; future output cores do not.\nCamera trajectory is not a road surface.\nGaussian training has not started.'
     legend.text(0,.015,note,color='#94a3b8',fontsize=9,linespacing=1.6,va='bottom',transform=legend.transAxes)
     fig.suptitle('Continuous capture → shared route → training regions',color='white',fontsize=21,x=.08,ha='left',y=.975)
     fig.savefig(out/'route_overview.png',dpi=180,facecolor=fig.get_facecolor(),bbox_inches='tight')
     plt.close(fig)
+    motion_html = ''
+    if quality.get('motion'):
+        write_motion_plot(out, route)
+        motion_html = '<h2>Motion plausibility</h2><img src="motion_quality.png" alt="Reconstructed travel over time and window speed"><p>Diagnostic only: no positions are warped to match speed expectations.</p>'
     rows = ''.join(f"<tr><td>{r['region_id']}</td><td>{r['core_s'][0]:.1f}–{r['core_s'][1]:.1f}</td><td>{r['context_time_seconds'][0]:.2f}–{r['context_time_seconds'][1]:.2f}</td><td>{len(r['train_camera_ids'])}</td><td>{len(r['held_out_camera_ids'])}</td></tr>" for r in (plan['regions'] if plan else []))
     (out/'index.html').write_text('<!doctype html><meta charset="utf-8"><title>Track02 route review</title>'
         '<style>body{background:#0b1220;color:#dbeafe;font:16px system-ui;margin:40px auto;max-width:1400px}img{width:100%}td,th{padding:12px;text-align:left;border-bottom:1px solid #334155}a{color:#38bdf8}</style>'
         f'<h1>Track02 route review</h1><p>{html.escape(preview["scaleNote"])}. Status: {html.escape(preview["status"])}.</p>'
         '<img src="route_overview.png" alt="Reconstructed route and proposed training regions">'
+        +motion_html+
         '<h2>Proposed video intervals</h2><p>Use overlapping context for training. Retain only validated core ownership after training. These are source video seconds, not speed-based equal-duration cuts.</p>'
         '<table><tr><th>Region</th><th>Core / nominal m</th><th>Video context / s</th><th>Training views</th><th>Held-out views</th></tr>'+rows+'</table>'
         '<p>Not yet approved for dense training. Inspect reconstruction shape, coverage, grades and transitions first. Future dense registration must keep this global frame and held-out frame membership.</p>'
-        '<p><a href="coverage.json">Coverage evidence</a> · <a href="training_regions.csv">Region CSV</a> · <a href="route_preview.json">Unity marker data</a></p>',encoding='utf-8')
+        '<p><a href="coverage.json">Coverage evidence</a> · <a href="quality.json">Quality evidence</a> · <a href="training_regions.csv">Region CSV</a> · <a href="route_preview.json">Unity marker data</a></p>',encoding='utf-8')
+
+
+def write_motion_plot(out, route):
+    motion = route['quality']['motion']
+    times = np.array([s['timestamp_seconds'] for s in route['samples']])
+    distance = np.array([s['s'] for s in route['samples']])
+    fig, axes = plt.subplots(1,2,figsize=(15,4.5),facecolor='#0b1220',constrained_layout=True)
+    for ax in axes:
+        ax.set_facecolor('#111c30'); ax.tick_params(colors='#cbd5e1'); ax.grid(color='#334155',alpha=.4)
+        for spine in ax.spines.values(): spine.set_color('#334155')
+        ax.xaxis.label.set_color('#cbd5e1'); ax.yaxis.label.set_color('#cbd5e1')
+        ax.set_xlabel('Video time / seconds')
+    axes[0].plot(times, distance/route['length']*100, color='#38bdf8', label='Reconstruction')
+    axes[0].plot(times, (times-times[0])/(times[-1]-times[0])*100, '--',color='#64748b',label='Uniform-speed reference only')
+    axes[0].set_ylabel('Fraction of total reconstructed travel / %')
+    axes[0].legend(facecolor='#111c30',labelcolor='#cbd5e1')
+    axes[1].plot(motion['window_centres_seconds'],motion['window_speeds'],color='#2dd4bf')
+    axes[1].set_ylabel(f"Travel speed / units per second ({motion['speed_window_seconds']:g}s window)")
+    axes[1].set_title(f"P95 / median {motion['window_p95_to_median']:.2f}x   |   Max / median {motion['window_max_to_median']:.2f}x",color='white',fontsize=11)
+    title = f"Motion check: {motion['decision'].replace('_',' ')} | capture expectation: {motion['capture_motion'].replace('_',' ')}"
+    fig.suptitle(title,color='#fb7185' if motion['decision']=='rejected' else 'white',fontsize=14)
+    fig.savefig(out/'motion_quality.png',dpi=160,facecolor=fig.get_facecolor())
+    plt.close(fig)
