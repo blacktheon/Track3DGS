@@ -1,0 +1,8 @@
+{
+  "region_id": "cell_001",
+  "parameters": {"mode": "single"},
+  "views": {
+    "edit": {"names": ["frame_001485_y-135.jpg"]},
+    "check": {"names": ["frame_001485_y-090.jpg", "frame_001485_y+135.jpg", "frame_001337_y-135.jpg", "frame_001637_y-135.jpg", "frame_001637_y-090.jpg", "frame_001787_y-135.jpg"]}
+  }
+}

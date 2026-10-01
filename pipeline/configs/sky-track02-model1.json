@@ -1,0 +1,8 @@
+{
+  "region_id": "cell_000",
+  "parameters": {"mode": "consensus"},
+  "views": {
+    "edit": {"split": "train", "stations": [28, 48, 68, 88, 110], "yaws": [-135, -45, 45, 135]},
+    "validation": {"split": "held_out", "stations": [35, 58, 80, 104, 116], "yaws": [-90, 0, 90, 180]}
+  }
+}
