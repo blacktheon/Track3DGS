@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "route_id": "my-route",
+  "revision": "r001",
+  "source_video": "../../data/raw/route.mp4",
+  "workspace": "../../data/routes/my-route/r001",
+  "vehicle_mask": "../../data/raw/vehicle-mask.png",
+  "sky_prior": "../../data/raw/sky-prior.png",
+  "mount_calibration": null,
+  "quality": {
+    "capture_motion": "unknown"
+  },
+  "capture": {
+    "sharpness_group": 3,
+    "keyframe_hz": 2,
+    "view_size": 1600,
+    "fov_degrees": 100,
+    "yaws": [
+      -135,
+      -90,
+      -45,
+      0,
+      45,
+      90,
+      135,
+      180
+    ],
+    "holdout_stride": 10
+  },
+  "scale": {
+    "method": "nominal_speed",
+    "speed_kmh": 10,
+    "status": "approximate"
+  },
+  "reconstruction": {
+    "mapper": "glomap",
+    "overlap": 6,
+    "max_gap_seconds": 2,
+    "panorama_rig": true
+  },
+  "regions": {
+    "core_length": 100,
+    "context_length": 20,
+    "start_margin": 20,
+    "end_margin": 20
+  },
+  "toolchain": {
+    "colmap": "colmap",
+    "training_python": "../../.venv-train/Scripts/python.exe"
+  }
+}

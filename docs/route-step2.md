@@ -11,14 +11,33 @@ This opt-in workflow reuses the tested Splatfacto backend while keeping every re
 
 ## Run sequentially
 
-From `pipeline`, with paths adjusted to your checkout:
+From `pipeline`, after installing the [utility/GPU environments](setup.md):
 
 ```powershell
-$utility = 'C:\Work\Unity\DSTA\Track3DGS\.venv\Scripts\python.exe'
-$gpu = 'C:\Work\Unity\DSTA\Track3DGS\.venv-train\Scripts\python.exe'
-$workspace = 'C:\Work\Unity\DSTA\Track3DGS\data\routes\track02\r002'
+$utility = (Resolve-Path ..\.venv\Scripts\python.exe).Path
+$gpu = (Resolve-Path ..\.venv-train\Scripts\python.exe).Path
+$workspace = (Resolve-Path ..\data\routes\my-route\r001).Path
 $run = "$workspace\training\t001"
-& $utility -u -m track3dgs.route_step2 --workspace $workspace --run-root $run --training-python $gpu --unity-project 'C:\Work\Unity\DSTA\QuestSBTC' --regions 0,1,2,3,4,5 --iterations 30000
+New-Item -ItemType Directory -Force $run | Out-Null
+```
+
+After inspecting and accepting your Step 1 route, record that decision for its
+exact hash. This records your review; it does not perform the review for you.
+
+```powershell
+@{
+    schema_version = 1
+    route_sha256 = (Get-FileHash "$workspace\route.json" -Algorithm SHA256).Hash.ToLowerInvariant()
+    accepted_for = 'Step 2 first training pass'
+    human_review = 'I inspected the route, camera directions, coverage and scale assumptions'
+    scale = 'Approximate; replace with the actual basis for this capture'
+    seam_acceptance = 'pending'
+} | ConvertTo-Json | Set-Content "$run\route_review.json" -Encoding utf8
+
+# Start with one region. No Unity project is required.
+& $utility -u -m track3dgs.route_step2 --workspace $workspace --run-root $run --training-python $gpu --regions 0 --iterations 30000
+# After reviewing the pilot, continue the region indices in your regions.json.
+# Add --unity-project ..\unity\Track3DGSViewer to publish review caches along the way.
 ```
 
 The coordinator trains and exports one region, cleans it, assigns its route core, renders held-out views, checks its seam with the preceding completed region, then publishes its Unity cache. It never trains all regions concurrently. `step2_state.json` records the active region/stage, completed regions from that invocation and any failure. Full logs are in `reports`. Restart with the same inputs to reuse verified completed training; checkpoints resume interrupted training. Changed training settings require a new revision. QC may rerun on resume.
@@ -51,17 +70,20 @@ Centres project onto the closest **continuous route segment**, rather than onto 
 
 `reports/qc/cell_NNN/index.html` compares held-out photographs, original/clean renders and alpha. `boundary_NNN/index.html` compares each neighboring cleaned reference and the globally sorted pair of trimmed cores. Photographs are shown with the same sky/vehicle mask. PSNR and low-alpha coverage are diagnostic evidence; there is no invented numeric threshold that declares a seam accepted. Inspect colour, road continuity, vegetation silhouettes, holes and duplicate structures. At most two Gaussian models are resident in each QC render.
 
-If a seam fails, preserve the result and use the evidence to choose a wider context, denser image registration, revised boundary, or shared repair region. Automated context-expansion retries and a reusable synthetic lateral-sweep command are not implemented. The [Track02 t001 results](track02-t001-results.md) include a separate one-run synthetic lateral diagnostic and its limitations. No pipeline status currently grants human visual acceptance automatically.
+If a seam fails, preserve the result and use the evidence to choose a wider context, denser image registration, revised boundary, or shared repair region. Automated context-expansion retries are not implemented. `route_lateral_qc --workspace <workspace> --run-root <run>` now provides the synthetic lateral seam sweep; its default forward/backward yaws (180/0 degrees) reflect the Track02 mounting and can be changed. The [Track02 t001 results](track02-t001-results.md) include a separate one-run synthetic lateral diagnostic and its limitations. No pipeline status currently grants human visual acceptance automatically.
 
-## Unity review in QuestSBTC
+## Standalone Unity review
 
-The selected renderer is the pinned `wu.yize.gsplat` 1.4.0 package already used by VR3DGS, including its recorded local patches. QuestSBTC additionally fixes global sorting for compatible Spark pairs in the URP editor preview; patch details and a forward/reverse image regression are recorded in that package. The new scene is `Assets/Scenes/Track02_TrainingPreview.unity`; open **Tools → Track3DGS → Training Model Preview**.
+Use the included `unity/Track3DGSViewer` project; QuestSBTC is not required.
+The [viewer guide](unity-viewer.md) covers installation, route-marker scenes,
+raw/clean/core/sky comparison, global pair sorting, recorded viewpoints and
+resource limits. `route_preview_models` recreates caches independently of
+training. It defaults to `Assets/Track3DGSData`, copies the route-marker export,
+and rejects different route revisions in an existing catalog.
 
-Select a completed chunk, original/clean/core representation, and optionally its next neighbor. Click **Load selected model(s)**. For seam review use **Trimmed route core**. Raw and cleaned context views intentionally overlap. Move the route-station slider or use a Scene view position for the Game camera. The preview is for editor inspection, not the game's driving/VR controls.
-
-Exactly two renderer slots exist. Switching clears both slots and releases their GPU resources before loading replacements. The original Step 1 marker scene remains separate. Global sorting is enabled for adjacent pairs. Spark compression is the efficient default; **Uncompressed reference** enables a single-chunk precision comparison. The package's global sorter requires Spark, so an uncompressed pair is explicitly rejected; native paired QC renders supply the full-precision seam reference. Each cache subtracts a regional origin before compression and places the object back at that origin in Unity, reducing float16 position error far from world zero. Only translation is baked, so SH coefficients and covariance remain unchanged. The importer applies RUB-to-Unity conversion once; the object translation reflects package Z once. The source portable PLY remains untouched.
-
-Generated cache PLYs are local data, not files to commit to Git. Recreate them with `route_preview_models` when moving to another checkout, then load the models through the preview window to refresh scene references.
+The optional [sky-volume cleanup](sky-cleanup.md) preserves full retained
+attributes and provenance. Its experimental results are separately reviewable;
+the baseline package export below continues to use `models/cell_NNN/core.ply`.
 
 ## Portable draft handoff
 

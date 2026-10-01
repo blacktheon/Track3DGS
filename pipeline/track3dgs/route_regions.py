@@ -94,3 +94,11 @@ def write_region_subsets(workspace, plan):
         writer.writerow(['region','core_start_nominal_m','core_end_nominal_m','context_start_seconds','context_end_seconds','train_views','held_out_views'])
         for r in plan['regions']:
             writer.writerow([r['region_id'],*r['core_s'],*r['context_time_seconds'],len(r['train_camera_ids']),len(r['held_out_camera_ids'])])
+
+
+def region_indices(regions, selection):
+    """All planned regions by default; explicit subsets must be ordered and unique."""
+    indices = list(range(len(regions))) if selection is None else list(map(int, selection.split(',')))
+    if not indices or indices != sorted(set(indices)) or any(i < 0 or i >= len(regions) for i in indices):
+        raise ValueError('Regions must be unique, increasing indices within the route plan')
+    return indices

@@ -1,0 +1,13 @@
+/Library/
+/Logs/
+/Temp/
+/Obj/
+/UserSettings/
+/Builds/
+/.vs/
+/*.csproj
+/*.sln
+/Assets/Track3DGSData/
+/Assets/Track3DGSData.meta
+/Assets/Scenes/
+/Assets/Scenes.meta

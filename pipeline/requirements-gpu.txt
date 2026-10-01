@@ -1,0 +1,14 @@
+# Python 3.11, Windows x64. Install PyTorch cu128 first (see docs/setup.md).
+torch==2.7.1
+torchvision==0.22.1
+nerfstudio==1.1.5
+gsplat==1.4.0
+fpsample==0.3.3
+transformers==5.16.1
+ninja==1.13.0
+psutil>=5.9
+plyfile>=1.0
+opencv-python-headless==4.10.0.84
+numpy>=1.26
+scipy>=1.11
+matplotlib>=3.8

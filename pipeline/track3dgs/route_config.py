@@ -3,6 +3,7 @@ import hashlib
 import json
 import math
 from pathlib import Path
+import shutil
 
 
 def file_hash(path):
@@ -61,8 +62,15 @@ def load_route_config(path):
                       'holdout_stride': 10, **cfg.get('capture', {})}
     cfg['reconstruction'] = {'mapper': 'glomap', 'overlap': 48,
                              'max_gap_seconds': 2, **cfg.get('reconstruction', {})}
-    cfg['toolchain'] = {'colmap': r'C:\Work\tools\colmap\bin\colmap.exe',
+    cfg['toolchain'] = {'colmap': 'colmap',
                        **cfg.get('toolchain', {})}
+    for key, value in cfg['toolchain'].items():
+        if key in ('colmap', 'training_python') and value:
+            cfg['toolchain'][key] = (str((path.parent / value).resolve())
+                if any(c in value for c in '/\\') else shutil.which(value) or value)
+    cache = cfg['reconstruction'].get('reuse_feature_database')
+    if cache:
+        cfg['reconstruction']['reuse_feature_database'] = str((path.parent / cache).resolve())
     for key in ('sharpness_group', 'view_size', 'holdout_stride'):
         value = cfg['capture'][key]
         if not isinstance(value, int) or value < (2 if key == 'holdout_stride' else 1):

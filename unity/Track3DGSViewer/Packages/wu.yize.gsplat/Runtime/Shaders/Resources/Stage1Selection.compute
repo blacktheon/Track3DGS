@@ -1,0 +1,87 @@
+// SPDX-License-Identifier: MIT
+#pragma kernel CountSelected
+#pragma kernel ScanBlocks
+#pragma kernel AddParentOffsets
+#pragma kernel ScatterSelected
+#pragma kernel SeedSortOrder
+
+#define STAGE1_GROUP_SIZE 256
+
+uint _SourceCount;
+uint _KeepCount;
+uint _ScanCount;
+StructuredBuffer<uint> _InverseRank;
+RWStructuredBuffer<uint> _BlockCounts;
+StructuredBuffer<uint> _BlockOffsets;
+RWStructuredBuffer<uint> _SelectedIds;
+StructuredBuffer<uint> _ScanInput;
+RWStructuredBuffer<uint> _ScanOffsets;
+RWStructuredBuffer<uint> _ScanSums;
+StructuredBuffer<uint> _ParentOffsets;
+RWStructuredBuffer<uint> _SortOrder;
+groupshared uint s_values[STAGE1_GROUP_SIZE];
+
+uint Selected(uint index)
+{
+    // Do not rely on short-circuit evaluation for an out-of-range buffer load.
+    if (index >= _SourceCount) return 0;
+    return _InverseRank[index] < _KeepCount ? 1 : 0;
+}
+
+uint InclusiveScan(uint value, uint lane)
+{
+    s_values[lane] = value;
+    GroupMemoryBarrierWithGroupSync();
+    for (uint offset = 1; offset < STAGE1_GROUP_SIZE; offset <<= 1)
+    {
+        uint add = 0;
+        if (lane >= offset) add = s_values[lane - offset];
+        GroupMemoryBarrierWithGroupSync();
+        s_values[lane] += add;
+        GroupMemoryBarrierWithGroupSync();
+    }
+    return s_values[lane];
+}
+
+[numthreads(STAGE1_GROUP_SIZE, 1, 1)]
+void CountSelected(uint3 id : SV_DispatchThreadID, uint lane : SV_GroupIndex, uint3 group : SV_GroupID)
+{
+    s_values[lane] = Selected(id.x);
+    GroupMemoryBarrierWithGroupSync();
+    for (uint stride = STAGE1_GROUP_SIZE / 2; stride > 0; stride >>= 1)
+    {
+        if (lane < stride) s_values[lane] += s_values[lane + stride];
+        GroupMemoryBarrierWithGroupSync();
+    }
+    if (lane == 0) _BlockCounts[group.x] = s_values[0];
+}
+
+[numthreads(STAGE1_GROUP_SIZE, 1, 1)]
+void ScanBlocks(uint3 id : SV_DispatchThreadID, uint lane : SV_GroupIndex, uint3 group : SV_GroupID)
+{
+    uint value = 0;
+    if (id.x < _ScanCount) value = _ScanInput[id.x];
+    uint sum = InclusiveScan(value, lane);
+    if (id.x < _ScanCount) _ScanOffsets[id.x] = sum - value;
+    if (lane == STAGE1_GROUP_SIZE - 1) _ScanSums[group.x] = sum;
+}
+
+[numthreads(STAGE1_GROUP_SIZE, 1, 1)]
+void AddParentOffsets(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x < _ScanCount) _ScanOffsets[id.x] += _ParentOffsets[id.x / STAGE1_GROUP_SIZE];
+}
+
+[numthreads(STAGE1_GROUP_SIZE, 1, 1)]
+void ScatterSelected(uint3 id : SV_DispatchThreadID, uint lane : SV_GroupIndex, uint3 group : SV_GroupID)
+{
+    uint keep = Selected(id.x);
+    uint prefix = InclusiveScan(keep, lane) - keep;
+    if (keep != 0) _SelectedIds[_BlockOffsets[group.x] + prefix] = id.x;
+}
+
+[numthreads(STAGE1_GROUP_SIZE, 1, 1)]
+void SeedSortOrder(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x < _KeepCount) _SortOrder[id.x] = _SelectedIds[id.x];
+}

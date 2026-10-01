@@ -1,5 +1,6 @@
 """Sequential Splatfacto training in the reviewed route frame, with native SH3."""
 import argparse
+from .route_regions import region_indices
 from contextlib import contextmanager
 import json
 import os
@@ -190,7 +191,7 @@ def run_region_training(workspace, region, settings):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--workspace',required=True);parser.add_argument('--run-root',required=True)
-    parser.add_argument('--training-python',required=True);parser.add_argument('--regions',default='0,1,2,3,4,5')
+    parser.add_argument('--training-python',required=True);parser.add_argument('--regions',default=None)
     parser.add_argument('--iterations',type=int,default=30000)
     args=parser.parse_args();root=Path(args.workspace)
     route=read_json(root/'route.json')
@@ -198,7 +199,7 @@ def main():
     plan=read_json(root/'regions.json')
     settings={'run_root':args.run_root,'training_python':args.training_python,'iterations':args.iterations}
     with gpu_lease(root.parent.parent/'.gpu-training.lock'):
-        for index in map(int,args.regions.split(',')):
+        for index in region_indices(plan['regions'],args.regions):
             run_region_training(root,plan['regions'][index],settings)
 
 
