@@ -1,7 +1,9 @@
 # Installation
 
 The supported training path is **Windows x64 with an NVIDIA CUDA GPU**. The
-repository and included Unity viewer work independently of QuestSBTC. Capture
+repository and included Unity viewer work independently of QuestSBTC. Use a short
+checkout path such as `C:\Work\Track3DGS`: deeply nested paths can exceed Windows
+path limits inside Unity PackageCache importers. Capture
 videos, masks and trained PLYs are local inputs; none are downloaded by cloning.
 
 ## Utility environment
@@ -46,7 +48,8 @@ Windows environment; use the Python 3.11 Windows wheel where available, or build
 it with the same C++ toolchain. The [recorded environment](validation/gpu-environment-2026-10-01.json)
 lists the versions present during verification. It is an audit snapshot, not a
 promise that every unrelated installed package is necessary. The GPU requirements
-file pins the important training interfaces; a complete fresh GPU installation
+file pins the important training interfaces and passed a fresh dependency-resolution
+dry run; a complete fresh GPU installation
 is distinct from the verified existing-environment rendering tests.
 
 `cuda_env.bat` discovers Visual Studio through `vswhere` and respects `CUDA_PATH`.

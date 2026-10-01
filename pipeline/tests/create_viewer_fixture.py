@@ -13,6 +13,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from track3dgs.route_config import atomic_json, file_hash
 from track3dgs.route_preview_models import publish_preview, publish_sky, write_preview_ply
+from track3dgs.route_training import region_training_fingerprint
 
 
 def create_fixture(unity):
@@ -28,6 +29,9 @@ def create_fixture(unity):
             markers.append(dict(frameId=f'fixture{i}', time=i, distance=i*10, x=i*10, y=0, z=0,
                 fx=1, fy=0, fz=0, ux=0, uy=1, uz=0, region=min(i,1)))
         atomic_json(root/'route.json', {'route_id':'synthetic-smoke', 'samples':samples})
+        atomic_json(run/'route_review.json', {'route_sha256':file_hash(root/'route.json')})
+        (root/'cameras.jsonl').write_text('synthetic fixture')
+        atomic_json(root/'state/views_identity.json', {'fixture':True})
         region_preview = [dict(index=i,name=f'cell_{i:03d}',coreStart=i*10,coreEnd=(i+1)*10,
             contextStart=0,contextEnd=20,startTime=0,endTime=2) for i in range(2)]
         atomic_json(root/'reports/route_preview.json', dict(schemaVersion=1,routeId='synthetic-smoke',
@@ -42,9 +46,11 @@ def create_fixture(unity):
             vertices['rot_0']=1;vertices['f_dc_1']=.8
             for name in ('scale_0','scale_1','scale_2'): vertices[name]=np.log(.35)
             for name in ('splat','clean','core'): write_preview_ply(vertices,folder/(name+'.ply'))
-            atomic_json(folder/'model.json',{'local_to_package':np.eye(4).ravel().tolist()})
+            region=dict(region_id=f'cell_{index:03d}',cell_index=index,core_s=[index*10,(index+1)*10])
+            atomic_json(folder/'model.json',{'local_to_package':np.eye(4).ravel().tolist(),
+                'iterations':30000,'fingerprint':region_training_fingerprint(root,region,30000)})
             atomic_json(folder/'processing.json',{'raw_count':4,'clean_count':4,'core_count':4})
-            publish_preview(root,run,unity,dict(region_id=f'cell_{index:03d}',cell_index=index,core_s=[index*10,(index+1)*10]))
+            publish_preview(root,run,unity,region)
             cleanup=root/f'cleanup{index}';(cleanup/'models').mkdir(parents=True)
             write_preview_ply(vertices[:3],cleanup/'models/sky.ply')
             camera={'camera_to_package':pose.ravel().tolist(),'s':index*10+5,'yaw_degrees':0}

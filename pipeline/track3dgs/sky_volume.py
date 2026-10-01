@@ -220,6 +220,9 @@ def derive_core(workspace, output, core):
     source, result = root / report['source'], output / report['file']
     if file_hash(source) != report['source_sha256'] or file_hash(result) != report['sha256']:
         raise ValueError('Cleanup source or result changed')
+    result_provenance = result.with_suffix('.provenance.bin')
+    if file_hash(result_provenance) != report['provenance_sha256']:
+        raise ValueError('Cleanup retained-row provenance changed')
     raw = PlyData.read(str(source))['vertex'].data
     vertices = PlyData.read(str(core))['vertex'].data
     provenance = source.with_suffix('.provenance.bin')
@@ -230,7 +233,10 @@ def derive_core(workspace, output, core):
         ids['source_index'] = report['source_index']
         ids['source_row'] = np.arange(len(raw), dtype=np.uint64)
     core_ids = np.fromfile(core.with_suffix('.provenance.bin'), PROVENANCE_DTYPE)
-    retained = np.fromfile(result.with_suffix('.provenance.bin'), PROVENANCE_DTYPE)
+    retained = np.fromfile(result_provenance, PROVENANCE_DTYPE)
+    result_count = len(PlyData.read(str(result))['vertex'].data)
+    if result_provenance.stat().st_size != result_count * PROVENANCE_DTYPE.itemsize:
+        raise ValueError('Cleanup provenance length does not match retained rows')
     if len(ids) != len(raw) or len(core_ids) != len(vertices) or not np.isin(core_ids, ids).all():
         raise ValueError('Core provenance is not a subset of the cleaned source')
     order = np.argsort(ids)

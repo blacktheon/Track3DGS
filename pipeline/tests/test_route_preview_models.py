@@ -7,6 +7,7 @@ from track3dgs.route_preview_models import recenter_vertices
 def preview_fixture(tmp_path):
     from track3dgs.route_config import atomic_json, file_hash
     from track3dgs.route_preview_models import write_preview_ply
+    from track3dgs.route_training import region_training_fingerprint
     root, run, unity = tmp_path/'route', tmp_path/'run', tmp_path/'viewer'
     folder = run/'models/cell_000'; folder.mkdir(parents=True)
     region = dict(region_id='cell_000', cell_index=0, core_s=[0, 100])
@@ -14,8 +15,12 @@ def preview_fixture(tmp_path):
     b = a.copy(); b[0, 3] = 110
     atomic_json(root/'route.json', {'route_id': 'different-route', 'samples': [
         {'s': 0, 'rig_to_package': a.ravel().tolist()}, {'s': 100, 'rig_to_package': b.ravel().tolist()}]})
+    atomic_json(run/'route_review.json', {'route_sha256':file_hash(root/'route.json')})
     atomic_json(root/'reports/route_preview.json', {'schemaVersion': 1, 'routeSha256': file_hash(root/'route.json'), 'markers': []})
-    atomic_json(folder/'model.json', {'local_to_package': np.eye(4).ravel().tolist()})
+    (root/'cameras.jsonl').write_text('synthetic fixture')
+    atomic_json(root/'state/views_identity.json', {'fixture':True})
+    atomic_json(folder/'model.json', {'local_to_package': np.eye(4).ravel().tolist(),
+        'iterations':30000,'fingerprint':region_training_fingerprint(root,region,30000)})
     v = np.zeros(2, dtype=[(n, '<f4') for n in ('x','y','z','f_rest_44')]); v['x'] = [60, 61]; v['z'] = -30
     for filename in ['splat.ply','clean.ply','core.ply']:
         write_preview_ply(v, folder/filename)
@@ -49,6 +54,47 @@ def test_publisher_rejects_route_mismatch_before_overwriting_data(tmp_path):
     with pytest.raises(ValueError, match='route|Route'):
         publish_preview(root, run, unity, region)
     assert all(p.read_bytes() == data for p, data in before.items())
+
+
+def test_publisher_rejects_training_run_from_another_route_before_creating_cache(tmp_path):
+    from track3dgs.route_preview_models import publish_preview
+    from track3dgs.route_config import atomic_json
+    root, run, unity, region = preview_fixture(tmp_path)
+    atomic_json(run/'route_review.json', {'route_sha256':'another-route-hash'})
+    with pytest.raises(ValueError, match='route|Route'):
+        publish_preview(root,run,unity,region)
+    assert not unity.exists()
+
+
+def test_publisher_rejects_changed_training_cameras_even_with_matching_route_review(tmp_path):
+    from track3dgs.route_preview_models import publish_preview
+    root,run,unity,region=preview_fixture(tmp_path)
+    (root/'cameras.jsonl').write_text('different reconstruction cameras')
+    with pytest.raises(ValueError,match='fingerprint'):
+        publish_preview(root,run,unity,region)
+    assert not unity.exists()
+
+
+def test_same_core_hash_with_changed_origin_invalidates_sky_cache(tmp_path):
+    from track3dgs.route_preview_models import publish_preview
+    from track3dgs.route_training import region_training_fingerprint
+    from track3dgs.route_config import atomic_json
+    from track3dgs.io_utils import read_json
+    root,run,unity,region=preview_fixture(tmp_path)
+    publish_preview(root,run,unity,region)
+    path=unity/'Assets/Track3DGSData/catalog.json';catalog=read_json(path)
+    catalog['entries'][0].update(skyPath='old-origin-sky.ply',skyCount=1)
+    catalog['reviewViews']=[{'cellIndex':0},{'cellIndex':1}]
+    atomic_json(path,catalog)
+    changed=dict(region,core_s=[20,120])
+    model=read_json(run/'models/cell_000/model.json')
+    model['fingerprint']=region_training_fingerprint(root,changed,30000)
+    atomic_json(run/'models/cell_000/model.json',model)
+    publish_preview(root,run,unity,changed)
+    result=read_json(path)
+    assert result['entries'][0]['x']==80
+    assert 'skyPath' not in result['entries'][0]
+    assert result['reviewViews']==[{'cellIndex':1}]
 
 
 def test_review_camera_reflects_rub_once_and_converts_opencv_down():

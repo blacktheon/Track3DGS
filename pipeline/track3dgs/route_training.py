@@ -131,15 +131,20 @@ def run_gpu(cmd, log):
         subprocess.run([str(launcher),*cmd],cwd=launcher.parent,env=env,stdout=stream,stderr=subprocess.STDOUT,check=True)
 
 
+def region_training_fingerprint(workspace, region, iterations):
+    root = Path(workspace)
+    return stage_fingerprint('regional-training',
+        {'route':file_hash(root/'route.json'),'cameras':file_hash(root/'cameras.jsonl'),
+         'views':file_hash(root/'state'/'views_identity.json')},
+        {'region':region,'iterations':iterations,'recipe':'splatfacto-native-rub-v1','image_cache':32},
+        {'nerfstudio':'1.1.5','gsplat':'1.4.0','torch':'2.7.1+cu128'})
+
+
 def run_region_training(workspace, region, settings):
     root = Path(workspace);run = Path(settings['run_root'])
     rid = region['region_id'];out = run/'models'/rid;out.mkdir(parents=True,exist_ok=True)
     reports = run/'reports';reports.mkdir(exist_ok=True)
-    fingerprint = stage_fingerprint('regional-training',
-        {'route':file_hash(root/'route.json'),'cameras':file_hash(root/'cameras.jsonl'),
-         'views':file_hash(root/'state'/'views_identity.json')},
-        {'region':region,'iterations':settings['iterations'],'recipe':'splatfacto-native-rub-v1','image_cache':32},
-        {'nerfstudio':'1.1.5','gsplat':'1.4.0','torch':'2.7.1+cu128'})
+    fingerprint = region_training_fingerprint(root,region,settings['iterations'])
     marker = out/'model.json'
     existing = completed_model(marker,fingerprint)
     if existing:

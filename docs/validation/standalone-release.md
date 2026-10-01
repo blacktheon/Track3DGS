@@ -5,7 +5,7 @@ Unity viewer. It does not retrain or replace the six original Track02 regions.
 
 ## Evidence
 
-- **CPU:** 129 tests passed in a freshly created Python 3.11.16 environment
+- **CPU:** 133 tests passed in a freshly created Python 3.11.16 environment
   installed from `pipeline/requirements.txt`, with FFmpeg on PATH. Tests run
   from `pipeline` using `python -m pytest -q`.
 - **Model 1 CUDA reproduction:** 378,428 source core rows; 1,932 centre seeds;
@@ -25,6 +25,16 @@ Unity viewer. It does not retrain or replace the six original Track02 regions.
 - **Pair sorting:** global merging enabled; pair versus combined-reference
   maximum RGB error **0.000000** in forward and reverse synthetic views. Blank
   renders explicitly fail this check. Evidence uses D3D12, not Android/stereo.
+- **Clean Git export:** the same 129 initial CPU tests and Unity fixture passed using
+  only committed files. A deeply nested initial export hit Windows path limits
+  in unrelated Unity package importers; repeating from a short checkout path
+  completed with no import exceptions.
+- **Review fixes:** regression cases now reject mismatched training runs/camera
+  fingerprints and changed cleanup provenance, and invalidate sky caches when
+  their recentering origin changes. All six original training fingerprints and
+  the real Model 2 core transfer were rechecked.
+- **Dependency recipe:** pip completed a fresh GPU dependency-resolution dry run
+  successfully. This is not a full installation or a new training acceptance run.
 - **Launcher:** the portable Visual Studio/CUDA discovery launched the actual
   RTX 5060 Ti GPU environment and the reproduced Model 2 cleanup.
 

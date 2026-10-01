@@ -110,7 +110,26 @@ def test_raw_cleanup_transfers_to_core_by_provenance_not_row_position(tmp_path):
     write_preview_ply(data[[3,1,2]],core); ids[[3,1,2]].tofile(core.with_suffix('.provenance.bin'))
     module.write_filtered(raw,np.array([False,True,False,False]),output/'models/sky.ply')
     atomic_json(output/'processing.json',dict(source='raw.ply',source_sha256=file_hash(raw),
-        file='models/sky.ply',sha256=file_hash(output/'models/sky.ply')))
+        file='models/sky.ply',sha256=file_hash(output/'models/sky.ply'),
+        provenance_sha256=file_hash(output/'models/sky.provenance.bin')))
     module.derive_core(tmp_path,output,core)
     assert PlyData.read(output/'models/sky_core.ply')['vertex'].data['x'].tolist()==[4,3]
     assert np.fromfile(output/'models/sky_core.provenance.bin',PROVENANCE_DTYPE)['source_row'].tolist()==[3,2]
+
+
+def test_core_transfer_rejects_changed_retained_provenance_before_writing(tmp_path):
+    from track3dgs.route_assembly import PROVENANCE_DTYPE
+    from track3dgs.route_config import atomic_json, file_hash
+    from track3dgs.route_preview_models import write_preview_ply
+    module=api();output=tmp_path/'cleanup';(output/'models').mkdir(parents=True)
+    raw=tmp_path/'raw.ply';core=tmp_path/'core.ply';data=np.zeros(3,dtype=[('x','<f4')]);data['x']=[1,2,3]
+    ids=np.array([(0,0),(0,1),(0,2)],dtype=PROVENANCE_DTYPE)
+    for p in (raw,core):write_preview_ply(data,p);ids.tofile(p.with_suffix('.provenance.bin'))
+    module.write_filtered(raw,np.array([False,True,False]),output/'models/sky.ply')
+    atomic_json(output/'processing.json',dict(source='raw.ply',source_sha256=file_hash(raw),
+        file='models/sky.ply',sha256=file_hash(output/'models/sky.ply'),
+        provenance_sha256=file_hash(output/'models/sky.provenance.bin')))
+    ids[[0,1]].tofile(output/'models/sky.provenance.bin')
+    with pytest.raises(ValueError,match='provenance|Provenance'):
+        module.derive_core(tmp_path,output,core)
+    assert not (output/'models/sky_core.ply').exists()

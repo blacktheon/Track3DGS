@@ -10,6 +10,7 @@ from plyfile import PlyData, PlyElement
 
 from .io_utils import read_json
 from .route_config import atomic_json, file_hash
+from .route_training import region_training_fingerprint
 
 
 def recenter_vertices(vertices,origin):
@@ -53,8 +54,12 @@ def publish_preview(workspace,run_root,unity_project,region,preview_folder=DEFAU
     root=Path(workspace);run=Path(run_root);unity=Path(unity_project)
     base,catalog=preview_catalog(root,unity,preview_folder)
     unity=unity.resolve()
+    if read_json(run/'route_review.json')['route_sha256'] != catalog['routeSha256']:
+        raise ValueError('Training run was reviewed for a different route revision')
     source=run/'models'/region['region_id']
     processing=read_json(source/'processing.json');model=read_json(source/'model.json')
+    if model.get('fingerprint') != region_training_fingerprint(root,region,model['iterations']):
+        raise ValueError('Training model fingerprint does not match this route, cameras, views and region')
     if not np.allclose(np.asarray(model['local_to_package']).reshape(4,4),np.eye(4)):
         raise ValueError('Preview adapter expects native package-frame masters')
     route=read_json(root/'route.json');samples=route['samples'];stations=[s['s'] for s in samples]
@@ -86,7 +91,8 @@ def publish_preview(workspace,run_root,unity_project,region,preview_folder=DEFAU
         entry[variant+'Path']=dst.relative_to(unity).as_posix();cache_records.append(cached)
     catalog_path=base/'catalog.json'
     old=next((e for e in catalog['entries'] if e['index']==entry['index']),{})
-    if old.get('coreSourceSha256') == entry['coreSourceSha256']:
+    if (old.get('coreSourceSha256') == entry['coreSourceSha256'] and
+            all(old.get(k) == entry[k] for k in ('x','y','z'))):
         entry.update({k:v for k,v in old.items() if k.startswith('sky')})
     else:
         catalog['reviewViews']=[v for v in catalog.get('reviewViews',[]) if v['cellIndex']!=entry['index']]

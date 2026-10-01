@@ -2,7 +2,9 @@
 
 Open **`unity/Track3DGSViewer`** with Unity Hub using **Unity 6000.3.19f1**.
 No QuestSBTC, VR3DGS, headset, XR package or private Unity package is required.
-This is an editor review project, not a Quest runtime or a game.
+This is an editor review project, not a Quest runtime or a game. Keep the checkout
+path short on Windows (for example `C:\Work\Track3DGS`); deeply nested Unity
+PackageCache paths can fail in package importers.
 
 It includes URP **17.3.0**, the embedded **wu.yize.gsplat 1.4.0** renderer pinned
 to upstream revision `a2bf458d6b16395e6570e9345f9f4408f92684b8`, and the same
